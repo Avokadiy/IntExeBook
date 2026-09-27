@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IntExeBook — Interactive tasks builder for English teachers</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
-<link rel="stylesheet" href="/static/style.css">
+<!-- relative paths work both on http://localhost (server mode) and when the
+     file is opened straight from disk via file:// (limited browser mode) -->
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="topbar">
@@ -29,6 +31,6 @@
 </main>
 
 <footer class="footer">IntExeBook · runs 100% locally · no internet needed</footer>
-<script src="/static/app.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
