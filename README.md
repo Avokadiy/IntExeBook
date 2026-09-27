@@ -1,90 +1,65 @@
 # 📖 IntExeBook
 
-**Interactive Exercise Book** — a local web app that turns textbook exercises
-into live interactive tasks for English lessons. Built for teachers: pick a
-textbook → Student's Book or Workbook → Unit → Lesson → Task, and the whole
-class solves it together on the screen.
+Interactive tasks for English teachers — runs 100% locally, no internet needed.
 
-Everything runs **100% locally** — no internet, no accounts, no dependencies
-(Python 3.8+ standard library only). The interface is in English.
+**No Python required.** The app now ships as a self-contained desktop program,
+plus several zero-knowledge launch options (see below).
 
-## 🚀 Quick start
+## How a teacher starts it (pick ONE)
 
+| Option | What you do | Requires installed? |
+|---|---|---|
+| **A. Portable EXE (Windows)** | Double-click `IntExeBook-1.0.0.exe` (in `release/` after build, or shared via USB/cloud). A window opens. Done. | nothing |
+| **B. `start.bat` / `start.sh`** | Double-click the launcher file next to this README. It automatically picks the best engine available: packaged app → Electron → Python server → plain browser mode. | nothing |
+| **C. Browser only** | Open `web/index.html` in Chrome/Edge/Firefox. Works without any server if your browser allows local file access; otherwise the page explains what to do. | nothing |
+
+### Building the portable EXE yourself (developer machine, needs Node.js)
 ```bash
-python server/app.py          # Windows: just double-click start.bat
+npm install          # once, downloads Electron
+npm run dist         # produces release/IntExeBook-<version>.exe (single file)
+npm start            # run the desktop app directly from source
+```
+The `.exe` is one standalone file (~270 MB) that can be copied to any Windows PC.
+macOS (`dmg`) and Linux (`AppImage`) builds: `npx electron-builder --mac` / `--linux`.
+
+## Teacher flow
+1. **Choose a textbook** (cards are generated from the `textbooks/` folder)
+2. **Student's Book** or **Workbook**
+3. **Unit → Lesson**
+4. **Task** → interactive player with instant checking, progress dots and a score screen.
+
+Supported task types: `multiple-choice`, `true-false`, `gap-fill`, `word-order`, `matching`.
+
+## Modular textbooks
+Add a new textbook by copying its **folder** or a **`.zip` / `.tar.gz` archive** into:
+* unpacked/source version → `textbooks/`
+* installed EXE version → `%APPDATA%\IntExeBook\textbooks` (a `_HOW-TO-ADD-TEXTBOOKS.txt` file sits there), then restart the app. Archives are unpacked automatically.
+
+Each package contains:
+```
+my-book/
+  manifest.json     id, title, subtitle, level, description, color, icon,
+                    "student": "Student's Book", "workbook": "Workbook"
+  student.json      { "units": [ { "id","title","lessons":[ { "id","title","page","tasks":[...] } ] } ] }
+  workbook.json     same schema
+  assets/           optional images/audio (served at /assets/<book>/...)
+```
+Copy `textbooks/_TEMPLATE/` and edit — full format reference inside.
+Folders starting with `_` are ignored. Broken packages show a warning card instead of crashing the app.
+
+## Architecture
+```
+desktop/server-core.js  pure-Node backend (used by the EXE): scans textbooks, serves API + UI
+desktop/main.js         Electron shell: window, writable user textbooks dir, first-run seeding
+server/app.py, loader.py  equivalent Python backend (optional lightweight mode, stdlib only)
+web/                    single-page UI (vanilla JS) shared by all modes; also works from file://
+textbooks/              modular content packs (2 demo courses included)
+start.bat / start.sh    smart launchers with automatic engine fallback
 ```
 
-then open **http://localhost:8000** in any browser.
-
-macOS / Linux alternative: `./start.sh` (starts the server and opens the browser).
-
-## 🧭 The flow
-
-1. **Choose a textbook** — cards are built automatically from everything you put into `textbooks/`.
-2. **Student's Book or Workbook** — both are offered if the pack contains them.
-3. **Choose a Unit**, then a **Lesson**.
-4. **Choose a task** — it opens in an interactive player with instant feedback,
-   progress dots, retry and a final score screen.
-
-Supported task types out of the box:
-
-| type              | what students do                                        |
-|-------------------|---------------------------------------------------------|
-| `multiple-choice` | tap the right option                                    |
-| `true-false`      | TRUE / FALSE                                            |
-| `gap-fill`        | type missing words (hints supported, several answers OK)|
-| `word-order`      | build the sentence from shuffled word chips             |
-| `matching`        | connect left–right pairs                                |
-
-## 📂 Modular textbook system
-
-To add a new textbook, **drop a folder or a `.zip` / `.tar.gz` archive into
-`textbooks/`** and refresh the page. Archives are unpacked automatically.
-
+## Development
+```bash
+python server/app.py --port 8000   # classic server mode (if you like Python)
+npm start                          # Electron dev mode
+node -e "require('./desktop/server-core.js').start(8000)"  # bare Node server, no Electron
 ```
-textbooks/
-├── pep-primary-3/            # demo pack 1
-│   ├── manifest.json         # title, level, colour, which books exist…
-│   ├── student.json          # units → lessons → tasks
-│   ├── workbook.json
-│   └── assets/               # optional images/audio
-├── cambridge-kidslife1/      # demo pack 2
-├── my-book.zip               # ← also works: just throw the archive in
-└── _TEMPLATE/                # copy-me template + format docs
-```
-
-Full file-format reference: [`textbooks/_TEMPLATE/README.md`](textbooks/_TEMPLATE/README.md).
-
-Folders/archives starting with `_` are ignored (that's why the template stays hidden).
-
-## 🗂 Project layout
-
-```
-server/app.py     tiny HTTP server + JSON API (stdlib only)
-server/loader.py  textbook scanner: folders, zip/tar auto-unpack, validation
-web/              front-end: index.html, style.css, app.js (vanilla JS SPA)
-textbooks/        your modular textbook packs (add/remove freely)
-start.bat/.sh     one-click launchers
-```
-
-API endpoints (useful for future features):
-
-```
-GET /api/textbooks
-GET /api/textbooks/<id>/book/<student|workbook>
-GET /api/textbooks/<id>/task/<slot>/<unit>/<lesson>/<task>
-GET /assets/<textbook-id>/<file>
-```
-
-## ✅ What's inside for the demo
-
-Two example packs (`PEP Primary English` and `Kids' Life Explorer`), each with
-Units 1–2, two lessons per unit and a Student's Book *and* Workbook — so you can
-click through the entire flow immediately.
-
-## 🔜 Ideas for the next iteration
-
-- more task types (listening with audio, drag-and-drop pictures, dictation)
-- team mode / scoreboard for lessons
-- a teacher editor to create tasks without touching JSON
-- exporting a lesson as a shareable link / printable worksheet

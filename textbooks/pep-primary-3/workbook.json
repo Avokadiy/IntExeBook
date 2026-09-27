@@ -69,12 +69,12 @@
               "type": "gap-fill",
               "title": "Missing letters",
               "instruction": "Complete the colour words.",
-              "text": "1. r _ d   2. b l u _   3. y _ l l o w   4. g r _ _ n",
+              "text": "1. The colour of blood is ___.  2. The sky is ___.  3. A lemon is ___.  4. Grass is ___.",
               "blanks": [
-                { "answers": ["e"], "hint": "red" },
-                { "answers": ["e"], "hint": "blue" },
-                { "answers": ["e"], "hint": "yellow" },
-                { "answers": ["ee"], "hint": "green" }
+                { "answers": ["red"], "hint": "the colour of blood" },
+                { "answers": ["blue"], "hint": "the colour of the sky" },
+                { "answers": ["yellow"], "hint": "the colour of a lemon" },
+                { "answers": ["green"], "hint": "the colour of grass" }
               ]
             },
             {

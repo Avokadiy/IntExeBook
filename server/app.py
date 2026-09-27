@@ -73,6 +73,10 @@ class Handler(BaseHTTPRequestHandler):
 
             parts = [p for p in path.split("/") if p]
 
+            # GET /api/ping                            -> health check
+            if parts == ["api", "ping"]:
+                return self._send_json({"ok": True, "engine": "python"})
+
             # GET /api/textbooks                       -> list all textbooks
             if parts == ["api", "textbooks"]:
                 return self._send_json({"textbooks": loader.scan_textbooks()})

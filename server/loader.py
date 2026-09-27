@@ -335,9 +335,9 @@ def scan_textbooks() -> list[dict]:
 def get_textbook_meta(folder_or_id: str) -> tuple[str, dict]:
     """Resolve a folder-name or textbook id -> (folder, manifest)."""
     os.makedirs(TEXTBOOKS_DIR, exist_ok=True)
-    # direct folder hit
+    # direct folder hit (also accepts an exact folder name, not just manifest id)
     cand = os.path.join(TEXTBOOKS_DIR, folder_or_id)
-    if os.path.isdir(cand) or folder_or_id.lower().endswith(ARCHIVE_EXTS):
+    if (os.path.isdir(cand) and _find_manifest(cand)) or folder_or_id.lower().endswith(ARCHIVE_EXTS):
         folder = _ensure_folder(folder_or_id)
         if folder and _find_manifest(folder):
             return folder, _read_manifest(_find_manifest(folder))  # type: ignore

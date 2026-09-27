@@ -16,8 +16,13 @@ const crumbsEl = document.getElementById("crumbs");
 const bookCache = {};   // "id/slot" -> book tree
 const taskCache = {};   // full url  -> task json
 
+/* When the UI is opened directly from disk (file://) there is no local
+   server; the same JSON textbooks are then read straight from the folder. */
+const FILE_MODE = location.protocol === "file:";
+const API = (p) => FILE_MODE ? p.replace(/^\//, "") : p;
+
 async function getJSON(url) {
-  const res = await fetch(url);
+  const res = await fetch(API(url));
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
   return data;
@@ -77,7 +82,18 @@ async function loadBookMeta(tbId) {
 }
 async function loadBook(tbId, slot) {
   const key = tbId + "/" + slot;
-  if (!bookCache[key]) bookCache[key] = await getJSON(`/api/textbooks/${encodeURIComponent(tbId)}/book/${slot}`);
+  if (bookCache[key]) return bookCache[key];
+  if (FILE_MODE) {
+    const tb = await loadBookMeta(tbId);
+    const book = await getJSON(`textbooks/${tb.folder}/${slot}.json`);
+    book.book_label = tb[slot] || (slot === "student" ? "Student's Book" : "Workbook");
+    book.textbook_title = tb.title || "";
+    for (const u of book.units || []) for (const l of u.lessons || [])
+      l.task_count = (l.tasks || []).length;
+    bookCache[key] = book;
+    return book;
+  }
+  bookCache[key] = await getJSON(`/api/textbooks/${encodeURIComponent(tbId)}/book/${slot}`);
   return bookCache[key];
 }
 function findUnit(book, unitId) { return book.units.find(u => u.id === unitId); }
@@ -104,9 +120,31 @@ async function viewTextbooks() {
       </div>
     </section>`;
   const grid = document.getElementById("textbookGrid");
-  const { textbooks } = await getJSON("/api/textbooks");
+  let textbooks;
+  if (FILE_MODE) {
+    // no local server: read every textbooks/<folder>/manifest.json directly
+    try {
+      const listing = await getJSON("textbooks/");
+      const folders = [...listing.matchAll(/href="([^"/]+)\/"/g)].map(m => m[1])
+        .filter(n => !n.startsWith("_") && !n.startsWith("."));
+      const results = await Promise.allSettled(folders.map(async f => {
+        const manifest = await getJSON("textbooks/" + f + "/manifest.json");
+        return Object.assign({ folder: f, id: f }, manifest);
+      }));
+      textbooks = results.filter(r => r.status === "fulfilled").map(r => r.value);
+    } catch (e) { textbooks = []; }
+  } else {
+    textbooks = (await getJSON("/api/textbooks")).textbooks;
+  }
+  textbooks.forEach(tb => {
+    tb.books = tb.books || ["student", "workbook"].filter(s => tb[s]).map(s => ({ slot: s, label: tb[s] }));
+  });
   if (!textbooks.length) {
-    grid.innerHTML = `<div class="error-box">No textbooks found. Drop a textbook folder or archive into <code>textbooks/</code>.</div>`;
+    grid.innerHTML = FILE_MODE
+      ? `<div class="error-box">Your browser cannot read the <code>textbooks/</code> folder directly.
+         Please start IntExeBook by double-clicking <b>start.bat</b> (Windows) or <b>start.sh</b> (Mac/Linux),
+         or use the ready-made <b>IntExeBook.exe</b> desktop app.</div>`
+      : `<div class="error-box">No textbooks found. Drop a textbook folder or archive into <code>textbooks/</code>.</div>`;
     return;
   }
   grid.innerHTML = "";
@@ -122,7 +160,7 @@ async function viewTextbooks() {
       ${(tb.books || []).map(b => `<span class="badge">${esc(b.label)}</span>`).join("")}
       ${tb.error ? `<p class="desc" style="color:#b91c1c">⚠ ${esc(tb.error)}</p>`
                  : `<p class="desc">${esc(tb.description || "")}</p>`}`;
-    if (!tb.error) card.onclick = () => navigate(`#/tb/${encodeURIComponent(tb.id)}`);
+    if (!tb.error) card.onclick = () => navigate(`#/tb/${encodeURIComponent(tb.folder || tb.id)}`);
     grid.appendChild(card);
   });
 }
@@ -262,8 +300,16 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
   const lesson = unit && findLesson(unit, lessonId);
   if (!lesson) throw new Error("Lesson not found");
   const url = `/api/textbooks/${encodeURIComponent(tbId)}/task/${slot}/${unitId}/${lessonId}/${taskId}`;
-  if (!taskCache[url]) taskCache[url] = await getJSON(url);
-  const task = taskCache[url];
+  let task;
+  if (FILE_MODE) {
+    const book = await loadBook(tbId, slot);
+    const unit = findUnit(book, unitId);
+    const lesson = unit && findLesson(unit, lessonId);
+    task = ((lesson && lesson.tasks) || []).find(t => t.id === taskId) || {};
+  } else {
+    if (!taskCache[url]) taskCache[url] = await getJSON(url);
+    task = taskCache[url];
+  }
 
   const tasks = lesson.tasks || [];
   const idx = Math.max(0, tasks.findIndex(t => t.id === taskId));
