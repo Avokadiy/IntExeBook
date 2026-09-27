@@ -1,2 +1,12 @@
-# Common compressed files
-*.zip
+# Dependencies — never commit (GitHub blocks files >100 MB)
+node_modules/
+dist/
+*.exe
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
