@@ -23,9 +23,37 @@ const API = (p) => FILE_MODE ? p.replace(/^\//, "") : p;
 
 async function getJSON(url) {
   const res = await fetch(API(url));
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
-  return data;
+  if (!res.ok) {
+    let msg = "";
+    try { msg = (await res.json()).error; } catch (e) { /* ignore */ }
+    throw new Error(msg || ("HTTP " + res.status));
+  }
+  return res.json();
+}
+
+/* Read a file relative to web/ when running in file:// mode.
+   Chrome blocks XHR on file:// but <script> tags still load, so we have a
+   fallback that turns the JSON file into a global variable. */
+let jsonpCounter = 0;
+function loadLocalFile(relPath) {
+  return fetch(API(relPath)).then(r => {
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r.json();
+  }).catch(() => new Promise((resolve, reject) => {
+    const cb = "__iebJsonp" + (++jsonpCounter);
+    const s = document.createElement("script");
+    const timer = setTimeout(() => { cleanup(); reject(new Error("Cannot load " + relPath)); }, 5000);
+    function cleanup() {
+      clearTimeout(timer);
+      delete window[cb];
+      s.remove();
+    }
+    window[cb] = (data) => { cleanup(); resolve(data); };
+    // appends "?__iebJsonp=N" — the browser ignores the query on file:// URLs
+    s.src = API(relPath) + (relPath.includes("?") ? "&" : "?") + "__ieb_cb=" + cb;
+    s.onerror = () => { cleanup(); reject(new Error("Cannot load " + relPath)); };
+    document.head.appendChild(s);
+  }));
 }
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -75,7 +103,7 @@ document.getElementById("brandHome").onclick = (ev) => { ev.preventDefault(); na
 
 /* ------------------------------------------------------------ helpers */
 async function loadBookMeta(tbId) {
-  const all = await getJSON("/api/textbooks");
+  const all = FILE_MODE ? await loadFileModeIndex() : await getJSON("/api/textbooks");
   const tb = all.textbooks.find(t => t.id === tbId || t.folder === tbId);
   if (!tb) throw new Error("Textbook not found: " + tbId);
   return tb;
@@ -85,7 +113,7 @@ async function loadBook(tbId, slot) {
   if (bookCache[key]) return bookCache[key];
   if (FILE_MODE) {
     const tb = await loadBookMeta(tbId);
-    const book = await getJSON(`textbooks/${tb.folder}/${slot}.json`);
+    const book = await loadLocalFile(`../textbooks/${tb.folder}/${slot}.json`);
     book.book_label = tb[slot] || (slot === "student" ? "Student's Book" : "Workbook");
     book.textbook_title = tb.title || "";
     for (const u of book.units || []) for (const l of u.lessons || [])
@@ -96,10 +124,50 @@ async function loadBook(tbId, slot) {
   bookCache[key] = await getJSON(`/api/textbooks/${encodeURIComponent(tbId)}/book/${slot}`);
   return bookCache[key];
 }
+/* Single task: the server endpoint returns it on its own; in file:// mode we
+   simply pick it out of the already-loaded book tree. */
+async function loadTask(tbId, slot, unitId, lessonId, taskId) {
+  if (FILE_MODE) {
+    const book = await loadBook(tbId, slot);
+    const unit = findUnit(book, unitId);
+    const lesson = unit && findLesson(unit, lessonId);
+    const task = ((lesson && lesson.tasks) || []).find(t => t.id === taskId);
+    if (!task) throw new Error("Task not found: " + taskId);
+    return Object.assign({}, task, { book_label: book.book_label, textbook_title: book.textbook_title });
+  }
+  const url = `/api/textbooks/${encodeURIComponent(tbId)}/task/${slot}/${encodeURIComponent(unitId)}/${encodeURIComponent(lessonId)}/${encodeURIComponent(taskId)}`;
+  if (!taskCache[url]) taskCache[url] = getJSON(url).catch(e => { delete taskCache[url]; throw e; });
+  return taskCache[url];
+}
 function findUnit(book, unitId) { return book.units.find(u => u.id === unitId); }
 function findLesson(unit, lessonId) { return (unit.lessons || []).find(l => l.id === lessonId); }
 
 /* ============================================================ Step 1 */
+
+/* ---- textbook list for file:// mode (no local server available) ----
+   The browser cannot list directory contents on the local disk, so we use a
+   pre-generated manifest: web/textbooks-index.js.  If it is missing or stale,
+   we fall back to probing textbooks/<name>/manifest.json directly. */
+let fileModeIndex = null;
+async function loadFileModeIndex() {
+  if (fileModeIndex) return fileModeIndex;
+  let data = null;
+  try {
+    await loadLocalFile("textbooks-index.js");   // executes window.IEB_TEXTBOOKS
+    if (Array.isArray(window.IEB_TEXTBOOKS)) data = { textbooks: window.IEB_TEXTBOOKS };
+  } catch (e) { /* index missing – fall through to probing */ }
+  if (!data || !Array.isArray(data.textbooks) || !data.textbooks.length) {
+    const KNOWN = ["pep-primary-3", "cambridge-kidslife1"];
+    const results = await Promise.allSettled(KNOWN.map(async f => {
+      const m = await loadLocalFile(`../textbooks/${f}/manifest.json`);
+      return Object.assign({ folder: f, id: m.id || f }, m);
+    }));
+    data = { textbooks: results.filter(r => r.status === "fulfilled").map(r => r.value) };
+  }
+  fileModeIndex = data;
+  return data;
+}
+
 async function viewTextbooks() {
   renderCrumbs([{ label: "🏠 Textbooks", href: "#/" }]);
   app.innerHTML = `
@@ -122,16 +190,8 @@ async function viewTextbooks() {
   const grid = document.getElementById("textbookGrid");
   let textbooks;
   if (FILE_MODE) {
-    // no local server: read every textbooks/<folder>/manifest.json directly
     try {
-      const listing = await getJSON("textbooks/");
-      const folders = [...listing.matchAll(/href="([^"/]+)\/"/g)].map(m => m[1])
-        .filter(n => !n.startsWith("_") && !n.startsWith("."));
-      const results = await Promise.allSettled(folders.map(async f => {
-        const manifest = await getJSON("textbooks/" + f + "/manifest.json");
-        return Object.assign({ folder: f, id: f }, manifest);
-      }));
-      textbooks = results.filter(r => r.status === "fulfilled").map(r => r.value);
+      textbooks = (await loadFileModeIndex()).textbooks;
     } catch (e) { textbooks = []; }
   } else {
     textbooks = (await getJSON("/api/textbooks")).textbooks;
@@ -299,17 +359,7 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
   const unit = findUnit(book, unitId);
   const lesson = unit && findLesson(unit, lessonId);
   if (!lesson) throw new Error("Lesson not found");
-  const url = `/api/textbooks/${encodeURIComponent(tbId)}/task/${slot}/${unitId}/${lessonId}/${taskId}`;
-  let task;
-  if (FILE_MODE) {
-    const book = await loadBook(tbId, slot);
-    const unit = findUnit(book, unitId);
-    const lesson = unit && findLesson(unit, lessonId);
-    task = ((lesson && lesson.tasks) || []).find(t => t.id === taskId) || {};
-  } else {
-    if (!taskCache[url]) taskCache[url] = await getJSON(url);
-    task = taskCache[url];
-  }
+  const task = await loadTask(tbId, slot, unitId, lessonId, taskId);
 
   const tasks = lesson.tasks || [];
   const idx = Math.max(0, tasks.findIndex(t => t.id === taskId));
@@ -401,7 +451,7 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
           <button class="btn btn-primary" id="moreBtn">Choose another task</button>
         </div>
       </div>`;
-    document.getElementById("againBtn").onclick = () => { delete taskCache[url]; route(); };
+    document.getElementById("againBtn").onclick = () => { route(); };
     document.getElementById("moreBtn").onclick = () =>
       navigate(`#/tb/${encodeURIComponent(tbId)}/${slot}/${encodeURIComponent(unitId)}/${encodeURIComponent(lessonId)}`);
   }
