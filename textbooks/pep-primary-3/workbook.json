@@ -1,0 +1,125 @@
+{
+  "units": [
+    {
+      "id": "u1",
+      "title": "Unit 1 — Hello!",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Practice 1 — Greetings",
+          "page": 2,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "gap-fill",
+              "title": "Write the greeting",
+              "instruction": "Complete the sentences with: Hello, Bye, thanks",
+              "text": "1. ___ , I'm Sam!  2. See you tomorrow — ___ !  3. “How are you?” — “I'm fine, ___ .”",
+              "blanks": [
+                { "answers": ["hello"], "hint": "a friendly opening" },
+                { "answers": ["bye"], "hint": "when you leave" },
+                { "answers": ["thanks", "thank you"], "hint": "be polite!" }
+              ]
+            },
+            {
+              "id": "t2",
+              "type": "word-order",
+              "title": "Unscramble",
+              "instruction": "Put the words in order.",
+              "words": ["are", "How", "you", "?"],
+              "answer": "How are you ?"
+            }
+          ]
+        },
+        {
+          "id": "l2",
+          "title": "Practice 2 — Names",
+          "page": 4,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "multiple-choice",
+              "title": "Odd one out",
+              "instruction": "Which word does NOT belong to introductions?",
+              "options": ["name", "my", "goodbye", "pencil"],
+              "answerIndex": 3
+            },
+            {
+              "id": "t2",
+              "type": "true-false",
+              "title": "Read and decide",
+              "instruction": "“Nice to meet you” is something you say when you meet someone for the first time.",
+              "answer": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u2",
+      "title": "Unit 2 — Colours",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Practice 1 — Spell the colours",
+          "page": 8,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "gap-fill",
+              "title": "Missing letters",
+              "instruction": "Complete the colour words.",
+              "text": "1. r _ d   2. b l u _   3. y _ l l o w   4. g r _ _ n",
+              "blanks": [
+                { "answers": ["e"], "hint": "red" },
+                { "answers": ["e"], "hint": "blue" },
+                { "answers": ["e"], "hint": "yellow" },
+                { "answers": ["ee"], "hint": "green" }
+              ]
+            },
+            {
+              "id": "t2",
+              "type": "matching",
+              "title": "Word to meaning",
+              "instruction": "Match the English colour to its translation.",
+              "pairs": [
+                { "left": "white", "right": "белый" },
+                { "left": "black", "right": "чёрный" },
+                { "left": "brown", "right": "коричневый" },
+                { "left": "orange", "right": "оранжевый" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "l2",
+          "title": "Practice 2 — Colour sentences",
+          "page": 10,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "word-order",
+              "title": "Make a sentence",
+              "instruction": "Put the words in order.",
+              "words": ["is", "The", "sky", "blue", "."],
+              "answer": "The sky is blue ."
+            },
+            {
+              "id": "t2",
+              "type": "multiple-choice",
+              "title": "Choose the question",
+              "instruction": "Answer: “It's pink.” Which was the question?",
+              "options": [
+                "What's your name?",
+                "What colour is it?",
+                "How old are you?",
+                "Where is my bag?"
+              ],
+              "answerIndex": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

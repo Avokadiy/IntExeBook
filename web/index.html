@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IntExeBook — Interactive tasks builder for English teachers</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#" id="brandHome">📖 IntExeBook</a>
+  <nav class="crumbs" id="crumbs"></nav>
+</header>
+
+<main id="app" class="container">
+  <!-- Step 1: textbooks -->
+  <section id="step-textbooks">
+    <div class="hero">
+      <h1>Interactive tasks in seconds</h1>
+      <p>Pick a textbook, choose a lesson and turn any exercise into a live,
+         interactive activity your students can solve right in class.</p>
+    </div>
+    <h2 class="step-title"><span class="stepnum">1</span> Choose a textbook</h2>
+    <div class="grid" id="textbookGrid">
+      <div class="loading">Loading textbooks…</div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">IntExeBook · runs 100% locally · no internet needed</footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

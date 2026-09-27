@@ -1,0 +1,149 @@
+{
+  "units": [
+    {
+      "id": "u1",
+      "title": "Unit 1 — My family",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Lesson 1 — This is my family!",
+          "page": 6,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "multiple-choice",
+              "title": "Who is who?",
+              "instruction": "Your mother's sister is your …",
+              "options": ["aunt", "cousin", "grandmother", "sister"],
+              "answerIndex": 0
+            },
+            {
+              "id": "t2",
+              "type": "gap-fill",
+              "title": "Present simple: have / has",
+              "instruction": "Complete with HAVE or HAS.",
+              "text": "1. I ___ a big family.  2. She ___ two brothers.  3. They ___ a pet dog.  4. He ___ a little sister.",
+              "blanks": [
+                { "answers": ["have"], "hint": "I / you / we / they" },
+                { "answers": ["has"], "hint": "she" },
+                { "answers": ["have"], "hint": "they" },
+                { "answers": ["has"], "hint": "he" }
+              ]
+            },
+            {
+              "id": "t3",
+              "type": "true-false",
+              "instruction": "“My uncle's son is my cousin.” — True or false?",
+              "title": "Family tree logic",
+              "answer": true,
+              "explanation": "Your aunt's and uncle's children are your cousins."
+            }
+          ]
+        },
+        {
+          "id": "l2",
+          "title": "Lesson 2 — Family photos",
+          "page": 8,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "word-order",
+              "title": "Describe the photo",
+              "instruction": "Put the words in order.",
+              "words": ["This", "my", "is", "brother", "."],
+              "answer": "This is my brother ."
+            },
+            {
+              "id": "t2",
+              "type": "matching",
+              "title": "Family words",
+              "instruction": "Match the person with their description.",
+              "pairs": [
+                { "left": "father's mother", "right": "grandmother" },
+                { "left": "parents' children", "right": "brothers and sisters" },
+                { "left": "aunt's children", "right": "cousins" },
+                { "left": "mother's brother", "right": "uncle" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u2",
+      "title": "Unit 2 — Farm animals",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Lesson 1 — On the farm",
+          "page": 14,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "multiple-choice",
+              "title": "What's on the farm?",
+              "instruction": "Which animal does NOT live on a farm?",
+              "options": ["cow", "sheep", "penguin", "horse"],
+              "answerIndex": 2
+            },
+            {
+              "id": "t2",
+              "type": "gap-fill",
+              "title": "Singular or plural?",
+              "instruction": "Write the plural form of the animal in brackets.",
+              "text": "1. I see three ___ (sheep) in the field.  2. There are five ___ (cow).  3. Two ___ (mouse) eat the cheese!  4. Look at those ___ (chicken)!",
+              "blanks": [
+                { "answers": ["sheep"], "hint": "irregular — it doesn't change!" },
+                { "answers": ["cows"], "hint": "+ s" },
+                { "answers": ["mice"], "hint": "irregular" },
+                { "answers": ["chickens"], "hint": "+ s" }
+              ]
+            },
+            {
+              "id": "t3",
+              "type": "true-false",
+              "title": "Animal facts",
+              "instruction": "A hen lays eggs.",
+              "answer": true
+            }
+          ]
+        },
+        {
+          "id": "l2",
+          "title": "Lesson 2 — Can you hear them?",
+          "page": 16,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "matching",
+              "title": "Animals & sounds",
+              "instruction": "Match the animal with the sound it makes.",
+              "pairs": [
+                { "left": "cow", "right": "moo" },
+                { "left": "sheep", "right": "baa" },
+                { "left": "duck", "right": "quack" },
+                { "left": "horse", "right": "neigh" }
+              ]
+            },
+            {
+              "id": "t2",
+              "type": "word-order",
+              "title": "There is / There are",
+              "instruction": "Put the words in order.",
+              "words": ["are", "There", "pigs", "ten", "on", "the", "farm"],
+              "answer": "There are ten pigs on the farm"
+            },
+            {
+              "id": "t3",
+              "type": "multiple-choice",
+              "title": "Can…?",
+              "instruction": "“___ a horse swim?” — Choose the correct question word.",
+              "options": ["Can", "Is", "Do", "Does"],
+              "answerIndex": 0
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
