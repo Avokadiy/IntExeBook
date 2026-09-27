@@ -1,7 +1,2 @@
-# Python bytecode
-__pycache__/
-*.pyc
-
-# Node / Electron build artefacts
-node_modules/
-release/
+# Common compressed files
+*.zip
