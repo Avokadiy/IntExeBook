@@ -169,6 +169,66 @@ class Handler(BaseHTTPRequestHandler):
                         l["task_count"] = len(l["tasks"])
                 return self._send_json(slim)
 
+            # GET /api/textbooks/<id>/raw/<slot>       -> FULL untrimmed book
+            # (used by the authoring editor when continuing an existing course)
+            if (len(parts) == 5 and parts[0] == "api"
+                    and parts[3] == "raw" and parts[1] == "textbooks"):
+                folder, manifest = loader.get_textbook_meta(parts[2])
+                book = loader.load_book(folder, manifest, parts[4])
+                return self._send_json(book)
+
+            # GET /api/textbooks/<id>/export           -> shareable .iebpack.json
+            if (len(parts) == 4 and parts[0] == "api" and parts[1] == "textbooks"
+                    and parts[3] == "export"):
+                folder, manifest = loader.get_textbook_meta(parts[2])
+                import base64 as _b64
+                assets = {}
+                adir = os.path.join(folder, "assets")
+                if os.path.isdir(adir):
+                    for root, _dirs, files in os.walk(adir):
+                        for fn in files:
+                            full = os.path.join(root, fn)
+                            rel = os.path.relpath(full, folder).replace("\\", "/")
+                            try:
+                                with open(full, "rb") as fh:
+                                    data = fh.read()
+                            except OSError:
+                                continue
+                            if len(data) > 8 * 1024 * 1024:
+                                continue          # skip huge media in exports
+                            ctype = mimetypes.guess_type(full)[0] or "application/octet-stream"
+                            assets[rel] = "data:%s;base64,%s" % (ctype, _b64.b64encode(data).decode())
+                books = {}
+                for slot in ("student", "workbook"):
+                    if manifest.get(slot):
+                        try:
+                            books[slot] = loader.load_book(folder, manifest, slot)
+                        except loader.TextbookError:
+                            pass
+                pack = {"format": "ieb-pack", "version": 1,
+                        "exported": __import__("datetime").datetime.now().isoformat(),
+                        "generator": "IntExeBook",
+                        "manifest": manifest, "books": books, "assets": assets}
+                body = json.dumps(pack, ensure_ascii=False).encode("utf-8")
+                fname = "%s.iebpack.json" % os.path.basename(folder)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Disposition", 'attachment; filename="%s"' % fname)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                return self.wfile.write(body)
+
+            # GET /api/drafts                          -> saved editor drafts
+            if parts == ["api", "drafts"]:
+                return self._send_json({"drafts": loader.list_drafts()})
+
+            # GET /api/drafts/<name>
+            if len(parts) == 3 and parts[0] == "api" and parts[1] == "drafts":
+                draft = loader.load_draft(parts[2])
+                if draft is None:
+                    return self._send_json({"error": "Draft not found"}, 404)
+                return self._send_json(draft)
+
             # GET /api/textbooks/<id>/task/<slot>/<unit>/<lesson>/<task>
             if (len(parts) == 8 and parts[0] == "api" and parts[1] == "textbooks"
                     and parts[3] == "task"):
@@ -197,6 +257,85 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("[intexebook] %s\n" % (fmt % args))
+
+    # ---------------------------------------------------------------- POST
+    def _read_body(self) -> dict:
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            raise loader.TextbookError("bad Content-Length")
+        if length <= 0:
+            return {}
+        if length > loader.MAX_BODY_BYTES:
+            raise loader.TextbookError("request body too large (max 64 MB)")
+        raw = self.rfile.read(length)
+        try:
+            data = json.loads(raw.decode("utf-8"))
+        except Exception:
+            raise loader.TextbookError("body must be valid JSON")
+        if not isinstance(data, dict):
+            raise loader.TextbookError("body must be a JSON object")
+        return data
+
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urllib.parse.urlparse(self.path)
+        path = urllib.parse.unquote(parsed.path)
+        parts = [p for p in path.split("/") if p]
+        try:
+            body = self._read_body()
+
+            # POST /api/textbooks                     -> create a new course
+            if parts == ["api", "textbooks"]:
+                return self._send_json(loader.create_textbook(body))
+
+            # POST /api/import                        -> install a shared pack
+            if parts == ["api", "import"]:
+                pack = body.get("pack") if isinstance(body.get("pack"), dict) else body
+                res = loader.import_pack(pack, body.get("id"))
+                return self._send_json(res)
+
+            # POST /api/drafts/<name>                 -> autosave an editor draft
+            if len(parts) == 3 and parts[0] == "api" and parts[1] == "drafts":
+                loader.save_draft(parts[2], body)
+                return self._send_json({"ok": True})
+
+            return self._send_json({"error": "Unknown endpoint"}, 404)
+        except loader.TextbookError as exc:
+            return self._send_json({"error": str(exc)}, 400)
+        except BrokenPipeError:
+            pass
+        except Exception as exc:  # pragma: no cover
+            return self._send_json({"error": "Server error: %s" % exc}, 500)
+
+    # ------------------------------------------------------------- PATCH
+    def do_PATCH(self) -> None:  # noqa: N802
+        parsed = urllib.parse.urlparse(self.path)
+        path = urllib.parse.unquote(parsed.path)
+        parts = [p for p in path.split("/") if p]
+        try:
+            body = self._read_body()
+            # PATCH /api/textbooks/<id>               -> update manifest / books
+            if len(parts) == 3 and parts[0] == "api" and parts[1] == "textbooks":
+                return self._send_json(loader.patch_textbook(parts[2], body))
+            return self._send_json({"error": "Unknown endpoint"}, 404)
+        except loader.TextbookError as exc:
+            return self._send_json({"error": str(exc)}, 400)
+        except Exception as exc:  # pragma: no cover
+            return self._send_json({"error": "Server error: %s" % exc}, 500)
+
+    # ------------------------------------------------------------- DELETE
+    def do_DELETE(self) -> None:  # noqa: N802
+        parsed = urllib.parse.urlparse(self.path)
+        path = urllib.parse.unquote(parsed.path)
+        parts = [p for p in path.split("/") if p]
+        try:
+            # DELETE /api/drafts/<name>
+            if len(parts) == 3 and parts[0] == "api" and parts[1] == "drafts":
+                ok = loader.delete_draft(parts[2])
+                return self._send_json({"ok": ok})
+            return self._send_json({"error": "Unknown endpoint"}, 404)
+        except Exception as exc:  # pragma: no cover
+            return self._send_json({"error": "Server error: %s" % exc}, 500)
 
 
 def main() -> None:
