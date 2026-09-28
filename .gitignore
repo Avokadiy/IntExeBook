@@ -1,1 +1,4 @@
-(empty)
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
