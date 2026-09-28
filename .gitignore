@@ -1,9 +1,1 @@
-# Python
-__pycache__/
-*.pyc
-
-# Node.js / Electron
-node_modules/
-
-# Archives
-*.zip
+(empty)
