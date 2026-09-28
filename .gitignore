@@ -1,1 +1,3 @@
-node_modules/
+# Compiled/Bytecode
+__pycache__/
+*.pyc
