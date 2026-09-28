@@ -14,6 +14,7 @@ import argparse
 import json
 import mimetypes
 import os
+import re
 import sys
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -84,24 +85,41 @@ class Handler(BaseHTTPRequestHandler):
     def _send_asset(self, tb_id: str, rel_parts) -> None:
         """Serve <textbook>/assets/<file>, transparently extracting the file
         from a sibling archive when the folder was never unpacked (a broken
-        or not-yet-scanned .zip must not disable audio/video playback)."""
+        or not-yet-scanned .zip must not disable audio/video playback).
+
+        The URL path already contains the "assets/" prefix (media sources are
+        stored as "assets/farm.wav" in task JSON), so it must be stripped
+        before joining — otherwise the lookup lands in assets/assets/ and
+        every <audio>/<video> element fails to load and stays inactive."""
         try:
             folder, _manifest = loader.get_textbook_meta(tb_id)
         except loader.TextbookError:
             folder = os.path.join(loader.TEXTBOOKS_DIR, tb_id)
-        rel = "/".join(rel_parts)
+        rel = "/".join(rel_parts).replace("\\", "/")
+        # normalise "assets/x", "<book>/assets/x" -> "x"
+        m = re.match(r"^(?:[^/]+/)?assets/(.+)$", rel)
+        rel = m.group(1) if m else rel
         full = loader.asset_path(folder, rel)
         if not os.path.isfile(full):
             stem = os.path.join(loader.TEXTBOOKS_DIR, tb_id)
-            for ext in (".zip", ".tar.gz", ".tgz", ".tar"):
-                arc = stem + ext
-                if not os.path.exists(arc):
-                    continue
-                try:
-                    if loader.extract_asset_from_archive(arc, rel, folder):
-                        break
-                except Exception:
-                    continue
+            candidates = [stem]
+            try:  # also look for an archive named after the resolved folder
+                candidates.append(os.path.join(
+                    loader.TEXTBOOKS_DIR, os.path.basename(folder)))
+            except Exception:
+                pass
+            for base in candidates:
+                for ext in (".zip", ".tar.gz", ".tgz", ".tar"):
+                    arc = base + ext
+                    if not os.path.exists(arc):
+                        continue
+                    try:
+                        if loader.extract_asset_from_archive(arc, rel, folder):
+                            break
+                    except Exception:
+                        continue
+                if os.path.isfile(full):
+                    break
         return self._send_file(full)
 
     # --------------------------------------------------------------- routing
