@@ -85,18 +85,32 @@ function renderCrumbs(items) {
 /* ------------------------------------------------------------ router */
 async function route() {
   const parts = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split("/").filter(Boolean);
+  /* authoring pages live in web/authoring.js; guard against a missing /
+     half-loaded script so the router never dies with "not defined" */
+  const authoring = () => {
+    if (typeof window.renderCreate !== "function")
+      throw new Error("The authoring module failed to load — check that shared.js and authoring.js are served correctly.");
+  };
   try {
-    if (parts[0] === "create") return renderCreate();
-    if (parts[0] === "import") return renderImport();
-    if (parts[0] === "edit" && parts[1] === "task" && parts.length >= 2)
-      return renderEditor({ mode: "task", tbId: parts[2], slot: parts[3], unitId: parts[4], lessonId: parts[5], taskId: parts[6] });
-    if (parts[0] === "edit" && parts[1] === "lesson" && parts.length >= 2)
-      return renderEditor({ mode: "lesson", tbId: parts[2], slot: parts[3], unitId: parts[4], lessonId: parts[5] });
-    if (parts[0] === "edit" && parts[1] === "unit" && parts.length >= 2)
-      return renderEditor({ mode: "unit", tbId: parts[2], slot: parts[3], unitId: parts[4] });
-    if (parts[0] === "edit" && parts[1] === "book" && parts.length >= 2)
-      return renderEditor({ mode: "book", tbId: parts[2], slot: parts[3] });
-    if (parts[0] === "edit") return renderEditor({ mode: "new" });
+    if (parts[0] === "create") { authoring(); return window.renderCreate(); }
+    if (parts[0] === "import") { authoring(); return window.renderImport(); }
+    if (parts[0] === "edit" && parts[1] === "task" && parts.length >= 2) {
+      authoring();
+      return window.renderEditor({ mode: "task", tbId: parts[2], slot: parts[3], unitId: parts[4], lessonId: parts[5], taskId: parts[6] });
+    }
+    if (parts[0] === "edit" && parts[1] === "lesson" && parts.length >= 2) {
+      authoring();
+      return window.renderEditor({ mode: "lesson", tbId: parts[2], slot: parts[3], unitId: parts[4], lessonId: parts[5] });
+    }
+    if (parts[0] === "edit" && parts[1] === "unit" && parts.length >= 2) {
+      authoring();
+      return window.renderEditor({ mode: "unit", tbId: parts[2], slot: parts[3], unitId: parts[4] });
+    }
+    if (parts[0] === "edit" && parts[1] === "book" && parts.length >= 2) {
+      authoring();
+      return window.renderEditor({ mode: "book", tbId: parts[2], slot: parts[3] });
+    }
+    if (parts[0] === "edit") { authoring(); return window.renderEditor({ mode: "new" }); }
     if (parts.length === 0) return viewTextbooks();
     if (parts[0] === "tb" && parts.length === 2) return viewBooks(parts[1]);
     if (parts[0] === "tb" && parts.length === 3) return viewUnits(parts[1], parts[2]);
@@ -875,6 +889,19 @@ function viewNotFound() {
    AUTHORING — teachers create / edit exercises themselves
    (web/authoring.js provides: renderCreate, renderImport, renderEditor)
    ============================================================ */
+
+/* ============================================================
+   SHARED HELPERS — exported for web/authoring.js.
+   app.js runs in strict mode inside its own classic-script scope,
+   so top-level const/function declarations are NOT properties of
+   window; authoring.js needs them through this bridge instead.
+   ============================================================ */
+window.IEB_APP = {
+  app, crumbsEl, bookCache, taskCache, FILE_MODE, API,
+  getJSON, loadLocalFile, esc, navigate, renderCrumbs, route,
+  loadBookMeta, loadBook, loadBookRaw, loadTask, loadFileModeIndex,
+  findUnit, findLesson, mediaSrc, normalizeMediaSrc,
+};
 
 /* go! */
 initSearch();

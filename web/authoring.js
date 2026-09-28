@@ -20,8 +20,22 @@
 "use strict";
 
 (function () {
+  "use strict";
   const S = window.IEB_SHARED;
   if (!S) { console.error("shared.js is missing"); return; }
+  /* helpers that live in app.js — classic scripts have separate scopes, so
+     they are exported through the window.IEB_APP bridge (see end of app.js) */
+  const A = window.IEB_APP || {};
+  const app = A.app;
+  const esc = A.esc;
+  const API = A.API;
+  const FILE_MODE = A.FILE_MODE;
+  const getJSON = A.getJSON;
+  const renderCrumbs = A.renderCrumbs;
+  const loadBookMeta = A.loadBookMeta;
+  const loadBookRaw = A.loadBookRaw;
+  const bookCache = A.bookCache;
+  const taskCache = A.taskCache;
 
   const LS_DRAFTS = "ieb-drafts";      // file:// fallback storage
   const MAX_ASSET = 12 * 1024 * 1024;  // 12 MB per media file in the browser
@@ -228,10 +242,8 @@
   }
 
   function pickTextbook() {
-    let books;
-    try { books = (FILE_MODE ? fileModeIndexCache : null); } catch (e) { books = null; }
     loadBookMeta("").catch(() => null).then(() => {
-      const get = FILE_MODE ? loadFileModeIndex() : getJSON("/api/textbooks");
+      const get = FILE_MODE ? A.loadFileModeIndex() : getJSON("/api/textbooks");
       get.then(data => {
         const list = (data.textbooks || []).filter(t => !t.error);
         const wrap = h("div", { class: "ed-modal" }, [
@@ -250,8 +262,6 @@
       }).catch(e => toast(String(e.message || e), "bad"));
     });
   }
-  let fileModeIndexCache = null;
-
   /* ============================================================ #/import */
   function renderImport() {
     renderCrumbs([{ label: "🏠 Textbooks", href: "#/" }, { label: "📥 Import pack" }]);
@@ -815,7 +825,7 @@
   }
 
   async function loadAllTextbooks() {
-    const data = FILE_MODE ? await loadFileModeIndex() : await getJSON("/api/textbooks");
+    const data = FILE_MODE ? await A.loadFileModeIndex() : await getJSON("/api/textbooks");
     return (data.textbooks || []).filter(t => !t.error);
   }
 
