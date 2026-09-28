@@ -1,1 +1,7 @@
-(empty)
+node_modules/
+.runtime/
+__pycache__/
+*.pyc
+dist/
+.DS_Store
+Thumbs.db
