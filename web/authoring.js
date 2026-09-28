@@ -659,7 +659,7 @@
       rowBtn("↑", () => moveItem(session.book.units, ui, -1), "tiny"),
       rowBtn("↓", () => moveItem(session.book.units, ui, 1), "tiny"),
       rowBtn("Rename id", () => { const n = prompt("Unit id", u.id); if (n) { u.id = S.slugify(n); markDirty(); renderEditorOutline(focus); } }, "tiny"),
-      rowBtn("🗑", () => { if (confirm("Delete unit “" + (u.title || u.id) + ”\"?")) { session.book.units.splice(ui, 1); markDirty(); renderEditorOutline(focus); } }, "danger tiny"),
+      rowBtn("🗑", () => { if (confirm("Delete unit \u201c" + (u.title || u.id) + "\u201d?")) { session.book.units.splice(ui, 1); markDirty(); renderEditorOutline(focus); } }, "danger tiny"),
     ]);
     card.appendChild(head);
     (u.lessons || []).forEach((l, li) => card.appendChild(lessonRow(u, ui, l, li, focus)));
@@ -1012,7 +1012,7 @@
       const body = holder.querySelector("#edPrevBody");
       if (!body) return;
       try {
-        window.IEB_TASK_ENGINES(renderEngineCtx(body, t));
+        window.renderTaskEngine(renderEngineCtx(body, t));
       } catch (e) {
         body.innerHTML = '<div class="ed-help">Preview unavailable: ' + esc(e.message) + "</div>";
       }
