@@ -386,14 +386,7 @@
   }
 
   function blankTask(type) {
-    switch (type) {
-      case "multiple-choice": return { type, title: "", instruction: "", options: ["", ""], answerIndex: 0 };
-      case "true-false": return { type, title: "", instruction: "", answer: true };
-      case "gap-fill": return { type, title: "", instruction: "", text: "I ___ a student.", blanks: [{ answers: ["am"] }] };
-      case "word-order": return { type, title: "", instruction: "", words: [], answer: "" };
-      case "matching": return { type, title: "", instruction: "", pairs: [{ left: "", right: "" }, { left: "", right: "" }] };
-      default: return { type, title: "", instruction: "" };
-    }
+    return (S && S.blankTask) ? S.blankTask(type) : { type, title: "", instruction: "" };
   }
 
   /* Start (or resume) a session. opts: {mode:'new'} | loaded draft | existing book */
@@ -1101,8 +1094,134 @@
       };
       redraw();
       wrap.appendChild(list);
+    } else if (t.type === "choose-odd-one-out") {
+      t.options = (t.options || []).map(o => typeof o === "string" ? { text: o, isOdd: false } : { text: o.text || "", isOdd: !!o.isOdd });
+      if (!t.options.length) t.options = [{ text: "", isOdd: false }, { text: "", isOdd: false }, { text: "", isOdd: true }];
+      wrap.appendChild(field("Category hint (optional — shown to students)", input(t.categoryHint || "", v => { t.categoryHint = v || undefined; markDirty(); }, { placeholder: "e.g. fruits" })));
+      wrap.appendChild(h("p", { class: "ed-help" }, "Tick “odd” next to every option that does NOT belong to the category."));
+      const list = h("div");
+      const redraw = () => {
+        list.innerHTML = "";
+        t.options.forEach((o, i) => {
+          const cb = h("input", { type: "checkbox", checked: o.isOdd, onchange: () => { o.isOdd = cb.checked; markDirty(); } });
+          list.appendChild(h("div", { class: "ed-optrow" }, [
+            cb, h("span", { class: "ed-mini-label" }, "odd"),
+            input(o.text, v => { o.text = v; markDirty(); }, { placeholder: "Option " + (i + 1) }),
+            rowBtn("✕", () => { t.options.splice(i, 1); redraw(); markDirty(); }, "danger tiny"),
+          ]));
+        });
+        list.appendChild(h("div", { class: "ed-row-actions" }, [
+          rowBtn("＋ Option", () => { t.options.push({ text: "", isOdd: false }); redraw(); markDirty(); }),
+        ]));
+      };
+      redraw();
+      wrap.appendChild(list);
+    } else if (t.type === "find-and-click") {
+      wrap.appendChild(field("Sentence / short text", textarea(t.text || "", v => { t.text = v; markDirty(); }, 3)));
+      wrap.appendChild(field("Words the student must click (comma separated)",
+        input((t.targets || []).join(", "), v => { t.targets = v.split(",").map(s => s.trim()).filter(Boolean); markDirty(); },
+          { placeholder: "cat, mat" })));
+      wrap.appendChild(h("p", { class: "ed-help" }, "Tip: attach a picture via the Media tab and put the words in it into the instruction too."));
+    } else if (t.type === "click-on-picture") {
+      t.hotspots = t.hotspots || [];
+      const imgRow = h("div", { class: "ed-inline" }, [
+        (() => {
+          const inp = h("input", { type: "file", accept: "image/*", class: "ed-file" });
+          inp.onchange = () => {
+            const f = inp.files[0];
+            if (!f) return;
+            if (f.size > MAX_ASSET) { toast("Image is larger than 12 MB — pick a smaller one.", "bad"); return; }
+            const rd = new FileReader();
+            rd.onload = () => {
+              const rel = "assets/" + f.name.replace(/[^\w.\-]+/g, "_");
+              if (session) session.assets[rel] = String(rd.result);
+              t.image = rel;
+              markDirty();
+              renderTabs("preview");   // jump straight into the hotspot editor
+              toast("Picture loaded — click on it to place hotspots, then name them in the Content tab.", "ok");
+            };
+            rd.readAsDataURL(f);
+            inp.value = "";
+          };
+          return inp;
+        })(),
+        h("span", { class: "ed-help" }, t.image ? "current: " + t.image : "no picture yet"),
+      ]);
+      wrap.appendChild(field("Picture", imgRow));
+      wrap.appendChild(h("p", { class: "ed-help" }, "After uploading, the Preview tab opens in “place hotspot” mode: every click on the picture adds a spot students must find. Name each spot below."));
+      const hsList = h("div");
+      const redrawHotspots = () => {
+        hsList.innerHTML = "";
+        t.hotspots.forEach((s, i) => {
+          hsList.appendChild(h("div", { class: "ed-gaprow" }, [
+            input(s.label, v => { s.label = v; markDirty(); }, { placeholder: "What to click (e.g. door)" }),
+            h("span", { class: "ed-help" }, Math.round(s.x) + "% × " + Math.round(s.y) + "%"),
+            rowBtn("✕", () => { t.hotspots.splice(i, 1); markDirty(); redrawHotspots(); }, "danger tiny"),
+          ]));
+        });
+        hsList.appendChild(rowBtn("＋ Hotspot (center)", () => { t.hotspots.push({ label: "", x: 50, y: 50, r: 8 }); markDirty(); redrawHotspots(); }));
+      };
+      redrawHotspots();
+      wrap.appendChild(hsList);
+    } else if (t.type === "word-search") {
+      t.words = t.words || [];
+      t.grid = t.grid || [];
+      wrap.appendChild(field("Words to hide (one per line, letters only)",
+        textarea(t.words.join("\n"), v => {
+          t.words = v.split("\n").map(s => s.toUpperCase().replace(/[^A-ZА-ЯЁ]/g, "")).filter(Boolean);
+          markDirty();
+        }, 5)));
+      const sizeSel = select("12", [["9", "9×9"], ["12", "12×12"], ["15", "15×15"]], () => {});
+      wrap.appendChild(h("div", { class: "ed-inline" }, [
+        field("Grid size", sizeSel),
+        rowBtn("⚙ Generate grid", () => {
+          if (!S.generateWordGrid) return;
+          const res = S.generateWordGrid(t.words, parseInt(sizeSel.value, 10) || 12);
+          t.grid = res.rows;
+          markDirty();
+          toast(res.ok ? "Grid generated ✓" : "Some words didn't fit — try a bigger grid", res.ok ? "ok" : "bad");
+          const old = wrap.querySelector(".ed-miniprev");
+          if (old) old.remove();
+          renderPreviewInto(wrap, t);
+        }, "primary tiny"),
+      ]));
+      wrap.appendChild(h("p", { class: "ed-help" }, "Students click neighbouring letters to trace each word. Words run horizontally, vertically or diagonally."));
+      renderPreviewInto(wrap, t);
+    } else if (t.type === "translate-match") {
+      t.pairs = t.pairs && t.pairs.length ? t.pairs : [{ left: "", right: "" }, { left: "", right: "" }];
+      wrap.appendChild(h("p", { class: "ed-help" }, "Left column = English, right column = translation (or any two sets you want matched)."));
+      const list = h("div");
+      const redraw = () => {
+        list.innerHTML = "";
+        t.pairs.forEach((p, i) => {
+          list.appendChild(h("div", { class: "ed-gaprow" }, [
+            input(p.left, v => { p.left = v; markDirty(); }, { placeholder: "English word" }),
+            h("span", null, "↔"),
+            input(p.right, v => { p.right = v; markDirty(); }, { placeholder: "Translation" }),
+            rowBtn("✕", () => { t.pairs.splice(i, 1); redraw(); markDirty(); }, "danger tiny"),
+          ]));
+        });
+        list.appendChild(rowBtn("＋ Pair", () => { t.pairs.push({ left: "", right: "" }); redraw(); markDirty(); }));
+      };
+      redraw();
+      wrap.appendChild(list);
     }
     return wrap;
+  }
+
+  /* mini live-preview embedded under some editors (word search grid etc.) */
+  function renderPreviewInto(host, t) {
+    const box = h("div", { class: "ed-miniprev" });
+    host.appendChild(box);
+    if (t.type !== "word-search" || !t.grid.length) return;
+    const g = h("div", { class: "ws-grid ed-ws-static" });
+    const cols = Math.max(...t.grid.map(r => String(r).length));
+    g.style.gridTemplateColumns = `repeat(${cols}, minmax(0,1fr))`;
+    t.grid.forEach(row => String(row).split("").forEach(ch => {
+      const c = h("span", { class: "ws-cell static" }, ch);
+      g.appendChild(c);
+    }));
+    box.appendChild(g);
   }
 
   /* ---- live preview using the real player engines ---- */
@@ -1114,6 +1233,13 @@
       tmp.innerHTML = A.mediaHtml(t, (session.savedTo || (session.target && session.target.tbId) || "") );
       const mediaEl = tmp.firstElementChild;
       if (mediaEl) holder.appendChild(mediaEl);
+    }
+    // hotspot placement mode for click-on-picture
+    let placeHint = null;
+    if (t.type === "click-on-picture") {
+      placeHint = h("div", { class: "ed-place-hint" },
+        "🎯 Placement mode: click anywhere on the picture to add a hotspot. Use ✕ next to a dot to remove it.");
+      holder.appendChild(placeHint);
     }
     holder.appendChild(h("div", { class: "player" }, [
       h("div", { class: "badge" }, t.type),
@@ -1131,8 +1257,47 @@
       } catch (e) {
         body.innerHTML = '<div class="ed-help">Preview unavailable: ' + esc(e.message) + "</div>";
       }
+      if (t.type === "click-on-picture") enableHotspotPlacement(body, t, holder);
     }, 0);
     return holder;
+  }
+
+  /* In the editor's preview of click-on-picture the engine runs in play mode
+     (hidden dots). We overlay authoring dots and turn clicks into placement. */
+  function enableHotspotPlacement(body, t, holder) {
+    const wrap = body.querySelector(".pic-wrap");
+    if (!wrap) return;
+    wrap.classList.add("ed-placing");
+    let uid = 0;
+    function drawAuthorDots() {
+      wrap.querySelectorAll(".ed-hot").forEach(el => el.remove());
+      (t.hotspots || []).forEach((s, i) => {
+        const d = document.createElement("button");
+        d.type = "button";
+        d.className = "ed-hot";
+        d.style.left = s.x + "%"; d.style.top = s.y + "%";
+        d.textContent = String(i + 1);
+        const kill = document.createElement("span");
+        kill.className = "ed-hot-x"; kill.textContent = "✕";
+        kill.onclick = (ev) => { ev.stopPropagation(); t.hotspots.splice(i, 1); markDirty(); drawAuthorDots(); };
+        d.appendChild(kill);
+        d.onclick = (ev) => ev.stopPropagation();
+        wrap.appendChild(d);
+      });
+    }
+    wrap.addEventListener("click", (e) => {
+      if (e.target.closest(".ed-hot")) return;
+      const rect = wrap.getBoundingClientRect();
+      const x = Math.min(98, Math.max(2, ((e.clientX - rect.left) / rect.width) * 100));
+      const y = Math.min(98, Math.max(2, ((e.clientY - rect.top) / rect.height) * 100));
+      t.hotspots = t.hotspots || [];
+      t.hotspots.push({ label: "Spot " + (t.hotspots.length + 1), x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, r: 8 });
+      markDirty();
+      drawAuthorDots();
+      const hint = holder.querySelector(".ed-place-hint");
+      if (hint) hint.textContent = "✓ Hotspot added — name it in the ✍ Content tab, or keep clicking to add more.";
+    });
+    drawAuthorDots();
   }
 
   /* Minimal context so the production player engines can run inside preview. */
@@ -1146,6 +1311,7 @@
       btnRetry: btnRetry,
       state: { results: [] }, idx: 0, drawDots: () => {}, goHash: () => {},
       tbId: session ? (session.savedTo || session.target && session.target.tbId || "") : "",
+      edit: true,
     };
   }
 

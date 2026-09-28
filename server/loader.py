@@ -66,7 +66,9 @@ MANIFEST_NAMES = ("manifest.json", "manifest.yaml", "manifest.yml")
 ARCHIVE_EXTS = (".zip", ".tar.gz", ".tgz")
 PACK_EXT = ".iebpack.json"
 
-TASK_TYPES = ("multiple-choice", "true-false", "gap-fill", "word-order", "matching")
+TASK_TYPES = ("multiple-choice", "true-false", "gap-fill", "word-order", "matching",
+              "choose-odd-one-out", "find-and-click", "click-on-picture",
+              "word-search", "translate-match")
 
 
 class TextbookError(Exception):
@@ -601,6 +603,96 @@ def validate_task(raw: Any) -> dict:
                 seen.add(l.lower())
                 clean_pairs.append({"left": l, "right": r})
         out["pairs"] = clean_pairs
+    elif ttype == "choose-odd-one-out":
+        raw_opts = raw.get("options") if isinstance(raw.get("options"), list) else []
+        oo = []
+        for i, o in enumerate(raw_opts):
+            text = _s(o.get("text")) if isinstance(o, dict) else _s(o)
+            if not text:
+                errors.append("option %d is empty" % (i + 1)); continue
+            oo.append({"text": text, "isOdd": bool(o.get("isOdd")) if isinstance(o, dict) else False})
+        n_odd = sum(1 for o in oo if o["isOdd"])
+        if len(oo) < 3:
+            errors.append("needs at least 3 options")
+        if not n_odd:
+            errors.append("mark at least one option as \u201codd one out\u201d")
+        if n_odd >= len(oo):
+            errors.append("keep at least one option that belongs to the category")
+        out["options"] = oo
+        if _s(raw.get("categoryHint")):
+            out["categoryHint"] = _s(raw.get("categoryHint"))
+    elif ttype == "find-and-click":
+        fc_text = _s(raw.get("text"))
+        fc_targets = [t for t in map(_s, (raw.get("targets") or [])) if t] if isinstance(raw.get("targets"), list) else []
+        if not fc_text:
+            errors.append("the sentence / text is empty")
+        if not fc_targets:
+            errors.append("add at least one word the student must click")
+        low = fc_text.lower()
+        for t in fc_targets:
+            if t.lower() not in low:
+                warnings.append("target \u201c%s\u201d does not appear in the text" % t)
+        out["text"] = fc_text
+        out["targets"] = fc_targets
+        out["mode"] = _s(raw.get("mode")) or "words"
+    elif ttype == "click-on-picture":
+        cp_img = _s(raw.get("image"))
+        if not cp_img:
+            errors.append("attach a picture first (Media tab or the file picker)")
+        spots = raw.get("hotspots") if isinstance(raw.get("hotspots"), list) else []
+        cp_clean = []
+        for i, sp in enumerate(spots):
+            if not isinstance(sp, dict) or not _s(sp.get("label")):
+                errors.append("hotspot %d needs a label" % (i + 1)); continue
+            try:
+                x = float(sp.get("x")); y = float(sp.get("y"))
+            except (TypeError, ValueError):
+                errors.append("hotspot \u201c%s\u201d has invalid coordinates" % sp.get("label")); continue
+            if not (0 <= x <= 100 and 0 <= y <= 100):
+                errors.append("hotspot \u201c%s\u201d has coordinates outside the picture (use 0-100 %%)" % sp.get("label")); continue
+            try:
+                r = max(4.0, float(sp.get("r")))
+            except (TypeError, ValueError):
+                r = 8.0
+            cp_clean.append({"label": _s(sp.get("label")), "x": x, "y": y, "r": r})
+        if not cp_clean:
+            errors.append("add at least one hotspot")
+        out["image"] = cp_img
+        out["hotspots"] = cp_clean
+    elif ttype == "word-search":
+        ws_words = []
+        for w in (raw.get("words") or []) if isinstance(raw.get("words"), list) else []:
+            wu = _re.sub("[^A-Z\u0410-\u042f\u0401]", "", _s(w).upper())
+            if wu:
+                ws_words.append(wu)
+        ws_grid = [_s(r).upper() for r in (raw.get("grid") or []) if _s(r)] if isinstance(raw.get("grid"), list) else []
+        if len(ws_words) < 2:
+            errors.append("add at least 2 words to hide")
+        if not ws_grid:
+            errors.append("the grid is empty — generate it in the editor")
+        if ws_grid and any(len(w) > max(len(r) for r in ws_grid) for w in ws_words):
+            errors.append("a word is longer than the grid — regenerate with a bigger size")
+        out["words"] = ws_words
+        out["grid"] = ws_grid
+        if _s(raw.get("note")):
+            out["note"] = _s(raw.get("note"))
+    elif ttype == "translate-match":
+        tm_pairs = raw.get("pairs") if isinstance(raw.get("pairs"), list) else []
+        if len(tm_pairs) < 2:
+            errors.append("needs at least 2 pairs")
+        tm_seen = set()
+        tm_clean = []
+        for i, p in enumerate(tm_pairs):
+            l = _s(p.get("left")) if isinstance(p, dict) else ""
+            r = _s(p.get("right")) if isinstance(p, dict) else ""
+            if not l or not r:
+                errors.append("pair %d is incomplete (both sides needed)" % (i + 1))
+            elif l.lower() in tm_seen:
+                errors.append("duplicate left item \u201c%s\u201d" % l)
+            else:
+                tm_seen.add(l.lower())
+                tm_clean.append({"left": l, "right": r})
+        out["pairs"] = tm_clean
 
     return {"ok": not errors, "errors": errors, "warnings": warnings, "value": out}
 
@@ -1204,7 +1296,9 @@ def asset_path(folder: str, rel: str) -> str:
 # --------------------------------------------------------------------------- #
 _TYPE_ICONS = {
     "multiple-choice": "🔤", "true-false": "☑️", "gap-fill": "✏️",
-    "word-order": "🧩", "matching": "🔗",
+    "word-order": "🧩", "matching": "🔗", "choose-odd-one-out": "🎯",
+    "find-and-click": "🔍", "click-on-picture": "🖱️", "word-search": "🔠",
+    "translate-match": "🌍",
 }
 _MEDIA_ICONS = {"image": "🖼️", "audio": "🎧", "video": "🎬"}
 

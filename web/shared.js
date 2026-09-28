@@ -23,9 +23,37 @@
     { type: "true-false", icon: "☑️", label: "True / False", hint: "A statement the student judges." },
     { type: "gap-fill", icon: "✏️", label: "Gap fill", hint: "Text with blanks (___) to type into." },
     { type: "word-order", icon: "🧩", label: "Word order", hint: "Rebuild a sentence from shuffled words." },
-    { type: "matching", icon: "🔗", label: "Matching", hint: "Match items from two columns." }
+    { type: "matching", icon: "🔗", label: "Matching", hint: "Match items from two columns." },
+    { type: "choose-odd-one-out", icon: "🎯", label: "Choose the odd ones out", hint: "Tap all options that do NOT belong to one category." },
+    { type: "find-and-click", icon: "🔍", label: "Find & click", hint: "Click the required words inside a sentence or text." },
+    { type: "click-on-picture", icon: "🖱️", label: "Click on the picture", hint: "Click marked spots on an image (hotspots)." },
+    { type: "word-search", icon: "🔠", label: "Word search", hint: "Find hidden words in a letter grid." },
+    { type: "translate-match", icon: "🌍", label: "Translate & match", hint: "Two-column matching with a translation twist." }
   ];
   var TYPE_IDS = TASK_TYPES.map(function (t) { return t.type; });
+
+  /* ---------------------------------------------------------- starter data */
+  function defaultTask(type) {
+    switch (type) {
+      case "multiple-choice": return { options: ["", ""], answerIndex: 0 };
+      case "true-false": return { answer: true };
+      case "gap-fill": return { text: "I ___ a student.", blanks: [{ answers: ["am"] }] };
+      case "word-order": return { words: [], answer: "" };
+      case "matching": return { pairs: [{ left: "", right: "" }, { left: "", right: "" }] };
+      case "choose-odd-one-out": return { options: [{ text: "", isOdd: false }, { text: "", isOdd: false }, { text: "", isOdd: true }], categoryHint: "" };
+      case "find-and-click": return { text: "The cat sat on the mat.", targets: ["cat"], mode: "words" };
+      case "click-on-picture": return { image: "", hotspots: [] };
+      case "word-search": return { words: ["CAT", "DOG"], grid: [], note: "" };
+      case "translate-match": return { pairs: [{ left: "", right: "" }, { left: "", right: "" }] };
+      default: return {};
+    }
+  }
+
+  function blankTask(type) {
+    var t = { type: type, title: "", instruction: "" };
+    Object.assign(t, defaultTask(type));
+    return t;
+  }
 
   var MEDIA_ICONS = { image: "🖼️", audio: "🎧", video: "🎬" };
 
@@ -143,6 +171,67 @@
         else { seenL[norm(l)] = 1; cleanPairs.push({ left: l, right: r }); }
       });
       out.pairs = cleanPairs;
+    } else if (type === "choose-odd-one-out") {
+      var ooRaw = Array.isArray(raw.options) ? raw.options : [];
+      var oo = [];
+      ooRaw.forEach(function (o, i) {
+        var text = isObj(o) ? str(o.text) : str(o);
+        if (!text) { err("option " + (i + 1) + " is empty"); return; }
+        oo.push({ text: text, isOdd: isObj(o) ? !!o.isOdd : false });
+      });
+      if (oo.length < 3) err("needs at least 3 options");
+      var nOdd = oo.filter(function (o) { return o.isOdd; }).length;
+      if (!nOdd) err("mark at least one option as “odd one out”");
+      if (nOdd >= oo.length) err("keep at least one option that belongs to the category");
+      out.options = oo;
+      if (str(raw.categoryHint)) out.categoryHint = str(raw.categoryHint);
+    } else if (type === "find-and-click") {
+      var fcText = str(raw.text);
+      if (!fcText) err("the sentence / text is empty");
+      var fcTargets = Array.isArray(raw.targets) ? raw.targets.map(str).filter(Boolean) : [];
+      if (!fcTargets.length) err("add at least one word the student must click");
+      var fcLower = fcText.toLowerCase();
+      fcTargets.forEach(function (t) {
+        if (fcLower.indexOf(t.toLowerCase()) < 0) warnings.push("target “" + t + "” does not appear in the text");
+      });
+      out.text = fcText;
+      out.targets = fcTargets;
+      out.mode = str(raw.mode) || "words";
+    } else if (type === "click-on-picture") {
+      var cpImg = str(raw.image);
+      if (!cpImg) err("attach a picture first (Media tab or the file picker below)");
+      var cpSpots = Array.isArray(raw.hotspots) ? raw.hotspots : [];
+      var cpClean = [];
+      cpSpots.forEach(function (s, i) {
+        if (!isObj(s) || !str(s.label)) { err("hotspot " + (i + 1) + " needs a label"); return; }
+        var x = parseFloat(s.x), y = parseFloat(s.y);
+        if (!(x >= 0 && x <= 100) || !(y >= 0 && y <= 100)) { err("hotspot “" + s.label + "” has coordinates outside the picture (use 0–100 %)"); return; }
+        cpClean.push({ label: str(s.label), x: x, y: y, r: Math.max(4, parseFloat(s.r) || 8) });
+      });
+      if (!cpClean.length) err("add at least one hotspot — click the picture in the preview to place it");
+      out.image = cpImg;
+      out.hotspots = cpClean;
+    } else if (type === "word-search") {
+      var wsWords = Array.isArray(raw.words) ? raw.words.map(function (w) { return str(w).toUpperCase().replace(/[^A-ZА-ЯЁ]/g, ""); }).filter(Boolean) : [];
+      if (wsWords.length < 2) err("add at least 2 words to hide");
+      var wsGrid = Array.isArray(raw.grid) ? raw.grid.map(function (r) { return String(r || "").toUpperCase(); }) : [];
+      if (!wsGrid.length) err("generate the grid (press the button below)");
+      var wsMax = Math.max.apply(null, wsGrid.map(function (r) { return r.length; }));
+      if (wsWords.some(function (w) { return w.length > wsMax; })) err("a word is longer than the grid — regenerate with a bigger size");
+      out.words = wsWords;
+      out.grid = wsGrid;
+      if (str(raw.note)) out.note = str(raw.note);
+    } else if (type === "translate-match") {
+      var tmPairs = Array.isArray(raw.pairs) ? raw.pairs : [];
+      if (tmPairs.length < 2) err("needs at least 2 pairs");
+      var tmSeen = {}, tmClean = [];
+      tmPairs.forEach(function (p, i) {
+        var l = isObj(p) ? str(p.left) : "", r = isObj(p) ? str(p.right) : "";
+        if (!l || !r) err("pair " + (i + 1) + " is incomplete (both sides needed)");
+        else if (tmSeen[norm(l)]) err("duplicate left item “" + l + "”");
+        else { tmSeen[norm(l)] = 1; tmClean.push({ left: l, right: r }); }
+      });
+      out.pairs = tmClean;
     }
 
     return { ok: errors.length === 0, errors: errors, warnings: warnings, value: out };
@@ -319,9 +408,59 @@
     };
   }
 
+  /* ---------------------------------------------------------- word-search grid
+     Places every word horizontally / vertically / diagonally into a grid,
+     fills the rest with random letters. Deterministic enough for authoring;
+     returns array of equal-length strings (rows). */
+  function generateWordGrid(words, size) {
+    var W = Math.max(size || 0, words.reduce(function (m, w) { return Math.max(m, w.length); }, 6));
+    var dirs = [[1, 0], [0, 1], [1, 1], [-1, 1]];
+    var slots = [];
+    for (var y = 0; y < W; y++) for (var x = 0; x < W; x++) slots.push([x, y]);
+    // shuffle slots
+    for (var i = slots.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = slots[i]; slots[i] = slots[j]; slots[j] = tmp;
+    }
+    var grid = [];
+    for (var r = 0; r < W; r++) { var row = []; for (var c = 0; c < W; c++) row.push(""); grid.push(row); }
+    function fits(word, x, y, dx, dy) {
+      var cx = x, cy = y;
+      for (var k = 0; k < word.length; k++) {
+        if (cx < 0 || cy < 0 || cx >= W || cy >= W) return false;
+        var cell = grid[cy][cx];
+        if (cell !== "" && cell !== word[k]) return false;
+        cx += dx; cy += dy;
+      }
+      return true;
+    }
+    var placedAll = true;
+    words.slice().sort(function (a, b) { return b.length - a.length; }).forEach(function (word) {
+      var done = false;
+      outer:
+      for (var si = 0; si < slots.length; si++) {
+        for (var di = 0; di < dirs.length; di++) {
+          var d = dirs[di];
+          if (fits(word, slots[si][0], slots[si][1], d[0], d[1])) {
+            var cx = slots[si][0], cy = slots[si][1];
+            for (var k = 0; k < word.length; k++) { grid[cy][cx] = word[k]; cx += d[0]; cy += d[1]; }
+            done = true; break outer;
+          }
+        }
+      }
+      if (!done) placedAll = false;
+    });
+    var alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for (var ry = 0; ry < W; ry++) for (var rx = 0; rx < W; rx++) {
+      if (grid[ry][rx] === "") grid[ry][rx] = alpha[Math.floor(Math.random() * 26)];
+    }
+    return { ok: placedAll, rows: grid.map(function (row) { return row.join(""); }) };
+  }
+
   return {
     FORMAT_VERSION: FORMAT_VERSION,
     TASK_TYPES: TASK_TYPES, TYPE_IDS: TYPE_IDS, MEDIA_ICONS: MEDIA_ICONS,
+    defaultTask: defaultTask, blankTask: blankTask, generateWordGrid: generateWordGrid,
     slugify: slugify, makeId: makeId,
     validateTask: validateTask, validateBook: validateBook, validateManifest: validateManifest,
     buildPack: buildPack, readPack: readPack,

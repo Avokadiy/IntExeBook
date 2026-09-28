@@ -451,7 +451,9 @@ async function viewLessons(tbId, slot, unitId) {
 /* ============================================================ Step 4: tasks */
 var TYPE_ICONS = {
   "multiple-choice": "🔤", "true-false": "☑️", "gap-fill": "✏️",
-  "word-order": "🧩", "matching": "🔗",
+  "word-order": "🧩", "matching": "🔗", "choose-odd-one-out": "🎯",
+  "find-and-click": "🔍", "click-on-picture": "🖱️", "word-search": "🔠",
+  "translate-match": "🌍",
 };
 
 /* ---------- media attachments (images / audio / video) ----------
@@ -864,12 +866,283 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
       };
     }
 
+    /* choose the odd ones out — tap everything that does NOT belong */
+    function engineOdd() {
+      let locked = false, done = false;
+      const opts = (task.options || []).map((o, i) => ({ text: o.text, isOdd: !!o.isOdd, pid: i }));
+      const shuffled = opts.slice();
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      body.innerHTML = `<div class="odd-grid" id="oddGrid"></div>` +
+        `<div class="odd-status" id="oddStatus">Tap every word that doesn't belong${task.categoryHint ? " to “" + esc(task.categoryHint) + "”" : ""}.</div>` +
+        `<div style="margin-top:16px"><button class="btn btn-primary" id="oddCheck" style="padding:10px 22px;font-size:15px">Check ✓</button></div>`;
+      const grid = document.getElementById("oddGrid");
+      const chosen = new Set();
+      shuffled.forEach(o => {
+        const b = document.createElement("button");
+        b.className = "odd-btn"; b.textContent = o.text; b.dataset.pid = o.pid;
+        b.onclick = () => {
+          if (locked || done) return;
+          if (chosen.has(o.pid)) { chosen.delete(o.pid); b.classList.remove("picked"); }
+          else { chosen.add(o.pid); b.classList.add("picked"); }
+        };
+        grid.appendChild(b);
+      });
+      document.getElementById("oddCheck").onclick = () => {
+        if (done) return;
+        locked = true; done = true;
+        const want = opts.filter(o => o.isOdd).map(o => o.pid);
+        const ok = chosen.size === want.length && want.every(p => chosen.has(p));
+        [...grid.children].forEach(el => {
+          const pid = Number(el.dataset.pid);
+          el.disabled = true;
+          const isOdd = opts[pid] && opts[pid].isOdd;
+          if (isOdd) el.classList.add(chosen.has(pid) ? "correct" : "missed");
+          else if (chosen.has(pid)) el.classList.add("wrong");
+        });
+        const oddWords = opts.filter(o => o.isOdd).map(o => o.text).join(", ");
+        setFeedback(ok, ok ? "" : (task.explanation || `The odd one(s) out: ${oddWords}.`));
+      };
+      renderEngine.reset = () => { locked = false; done = false; chosen.clear(); feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none"; engineOdd(); };
+    }
+
+    /* find & click words in a sentence */
+    function engineFindClick() {
+      const norm = s => String(s).toLowerCase().replace(/[.,!?;:"'’“”]+/g, "");
+      const targets = new Set((task.targets || []).map(norm));
+      const tokens = String(task.text || "").split(/(\s+)/);
+      body.innerHTML = `<div class="fc-text" id="fcText"></div><div class="odd-status" id="fcStatus">Find and click: <b>${(task.targets || []).map(esc).join(", ")}</b></div>`;
+      const host = document.getElementById("fcText");
+      let foundCount = 0, graded = false;
+      const need = targets.size;
+      tokens.forEach(tok => {
+        if (!tok || /^\s+$/.test(tok)) { host.appendChild(document.createTextNode(tok)); return; }
+        const clean = norm(tok);
+        const span = document.createElement("span");
+        span.className = "fc-word"; span.textContent = tok;
+        span.onclick = () => {
+          if (graded) return;
+          if (targets.has(clean)) {
+            if (span.classList.contains("found")) return;
+            span.classList.add("found"); foundCount++;
+            if (foundCount >= need) {
+              graded = true;
+              setFeedback(true, task.explanation || "");
+            }
+          } else {
+            span.classList.add("miss");
+            setTimeout(() => span.classList.remove("miss"), 600);
+            state.results[idx] = false; drawDots();
+          }
+        };
+        host.appendChild(span);
+      });
+      renderEngine.reset = () => { graded = false; foundCount = 0; feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none"; engineFindClick(); };
+    }
+
+    /* click on picture — hotspot finder.  In the authoring preview (ctx.edit)
+       the engine only draws the picture + a placeholder; the editor overlays
+       its own numbered, draggable-free placement dots. */
+    function enginePicture() {
+      const imgSrc = ctx.tbId != null && typeof mediaSrc === "function" ? mediaSrc(ctx.tbId, task.image || "") : (task.image || "");
+      if (ctx.edit) {
+        body.innerHTML = `
+          <div class="pic-wrap ed-pic-edit">
+            <img class="pic-target" src="${esc(imgSrc)}" alt="" draggable="false">
+            ${imgSrc ? "" : `<div class="ed-pic-missing">No picture yet — upload one in the ✍ Content tab.</div>`}
+          </div>`;
+        return;
+      }
+      const spots = (task.hotspots || []).map((s, i) => ({ ...s, hit: false, pid: i }));
+      body.innerHTML = `
+        <div class="pic-wrap" id="picWrap">
+          <img class="pic-target" src="${esc(imgSrc)}" alt="" draggable="false">
+        </div>
+        <div class="odd-status" id="picStatus">Click on: <b>${spots.map(s => esc(s.label)).join(", ")}</b></div>`;
+      const wrap = document.getElementById("picWrap");
+      let wrongTries = 0, graded = false;
+      spots.forEach(s => {
+        const dot = document.createElement("button");
+        dot.className = "pic-dot"; dot.title = "?";
+        dot.style.left = s.x + "%"; dot.style.top = s.y + "%";
+        dot.style.width = (s.r || 8) + "%"; dot.style.height = (s.r || 8) + "%";
+        dot.onclick = (e) => {
+          e.stopPropagation();
+          if (graded || s.hit) return;
+          s.hit = true; dot.classList.add("hit"); dot.textContent = "✓";
+          if (spots.every(x => x.hit)) { graded = true; setFeedback(wrongTries === 0, task.explanation || ""); }
+        };
+        wrap.appendChild(dot);
+      });
+      wrap.addEventListener("click", (e) => {
+        if (graded || e.target !== wrap && !e.target.classList.contains("pic-target")) return;
+        wrongTries++;
+        state.results[idx] = false; drawDots();
+        wrap.classList.add("shake");
+        setTimeout(() => wrap.classList.remove("shake"), 400);
+      });
+      renderEngine.reset = () => { graded = false; wrongTries = 0; spots.forEach(s => s.hit = false); feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none"; enginePicture(); };
+    }
+
+    /* word search — click letters to trace hidden words */
+    function engineWordSearch() {
+      const rows = (task.grid || []).map(r => String(r).toUpperCase());
+      const words = (task.words || []).map(w => w.toUpperCase()).filter(Boolean);
+      if (!rows.length || !words.length) {
+        body.innerHTML = `<div class="error-box">This word search has no grid yet — ask the teacher to regenerate it in the editor.</div>`;
+        if (btnNext) btnNext.disabled = false;
+        return;
+      }
+      // precompute where each word lives so clicks can be validated
+      const positions = {}; // word -> array of [y,x]
+      const dirs = [[0, 1], [1, 0], [1, 1], [-1, 1]];
+      words.forEach(w => {
+        outer:
+        for (let y = 0; y < rows.length; y++) for (let x = 0; x < (rows[y] || "").length; x++) {
+          for (const [dy, dx] of dirs) {
+            let ok = true;
+            for (let k = 0; k < w.length; k++) {
+              const cy = y + dy * k, cx = x + dx * k;
+              if (cy < 0 || cx < 0 || cy >= rows.length || cx >= rows[cy].length || rows[cy][cx] !== w[k]) { ok = false; break; }
+            }
+            if (ok) {
+              positions[w] = [];
+              for (let k = 0; k < w.length; k++) positions[w].push([y + dy * k, x + dx * k]);
+              continue outer;
+            }
+          }
+        }
+      });
+      body.innerHTML = `<div class="ws-grid" id="wsGrid"></div>
+        <div class="ws-legend" id="wsLegend"></div>`;
+      const gridEl = document.getElementById("wsGrid");
+      const legendEl = document.getElementById("wsLegend");
+      gridEl.style.gridTemplateColumns = `repeat(${Math.max(...rows.map(r => r.length))}, minmax(0,1fr))`;
+      const cellEls = [];
+      rows.forEach((row, y) => {
+        for (let x = 0; x < row.length; x++) {
+          const c = document.createElement("button");
+          c.className = "ws-cell"; c.textContent = row[x]; c.dataset.y = y; c.dataset.x = x;
+          c.onclick = () => pick(y, x, c);
+          gridEl.appendChild(c);
+          (cellEls[y] = cellEls[y] || {})[x] = c;
+        }
+      });
+      const remaining = words.filter(w => positions[w]).slice();
+      words.filter(w => !positions[w]).forEach(w => { /* not placeable — mark as found anyway */ });
+      let chain = [];
+      function sameCell(a, b) { return a[0] === b[0] && a[1] === b[1]; }
+      function clearChain() { chain.forEach(([y, x]) => cellEls[y] && cellEls[y][x] && cellEls[y][x].classList.remove("sel")); chain = []; }
+      function pick(y, x, el) {
+        if (el.classList.contains("found") || !remaining.length) return;
+        if (chain.some(p => sameCell(p, [y, x]))) { clearChain(); return; }
+        if (chain.length) {
+          const last = chain[chain.length - 1];
+          const dy = y - last[0], dx = x - last[1];
+          if (!(Math.abs(dy) <= 1 && Math.abs(dx) <= 1 && (dy || dx))) { clearChain(); }
+        }
+        chain.push([y, x]); el.classList.add("sel");
+        const typed = chain.map(([cy, cx]) => rows[cy][cx]).join("");
+        const hit = remaining.find(w => w === typed);
+        if (hit) {
+          chain.forEach(([cy, cx]) => { const ce = cellEls[cy][cx]; ce.classList.remove("sel"); ce.classList.add("found"); });
+          chain = [];
+          remaining.splice(remaining.indexOf(hit), 1);
+          redrawLegend();
+          if (!remaining.length) setFeedback(state.results[idx] !== false, task.note ? "Words: " + task.note : "");
+        } else if (!remaining.some(w => w.startsWith(typed))) {
+          state.results[idx] = false; drawDots();
+          clearChain();
+        }
+      }
+      function redrawLegend() {
+        legendEl.innerHTML = "";
+        words.forEach(w => {
+          const chip = document.createElement("span");
+          chip.className = "ws-word" + (remaining.includes(w) ? "" : " crossed");
+          chip.textContent = w;
+          legendEl.appendChild(chip);
+        });
+      }
+      redrawLegend();
+      renderEngine.reset = () => { clearChain(); feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none"; engineWordSearch(); };
+    }
+
+    /* translate & match — same mechanic as matching, kept separate so its
+       data can evolve (audio hints etc.) without touching classic matching */
+    function engineTranslateMatch() {
+      const pairs = (task.pairs || []).map((p, i) => ({ ...p, pid: i }));
+      const rights = pairs.slice();
+      for (let i = rights.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rights[i], rights[j]] = [rights[j], rights[i]];
+      }
+      let selLeft = null, matched = 0;
+      body.innerHTML = `
+        <div class="match-grid tm-grid">
+          <div class="match-col" id="tmL"></div>
+          <div class="match-col" id="tmR"></div>
+        </div>`;
+      const colL = document.getElementById("tmL"), colR = document.getElementById("tmR");
+      pairs.forEach(p => {
+        const el = document.createElement("div");
+        el.className = "match-item"; el.textContent = p.left; el.dataset.pid = p.pid;
+        el.onclick = () => pick("L", p.pid, el);
+        colL.appendChild(el);
+      });
+      rights.forEach(p => {
+        const el = document.createElement("div");
+        el.className = "match-item"; el.textContent = p.right; el.dataset.pid = p.pid;
+        el.onclick = () => pick("R", p.pid, el);
+        colR.appendChild(el);
+      });
+      function pick(side, pid, el) {
+        if (el.classList.contains("locked")) return;
+        if (side === "L") {
+          if (selLeft && selLeft.el !== el) selLeft.el.classList.remove("selected");
+          selLeft = (selLeft && selLeft.el === el) ? null : { pid, el };
+          el.classList.toggle("selected", !!selLeft && selLeft.el === el);
+          return;
+        }
+        if (!selLeft) { el.animate([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }], { duration: 250 }); return; }
+        const leftEl = selLeft.el;
+        if (selLeft.pid === pid) {
+          leftEl.classList.remove("selected");
+          leftEl.classList.add("locked-ok", "locked");
+          el.classList.add("locked-ok", "locked");
+          matched++;
+          if (matched === pairs.length) {
+            const hadMistake = state.results[idx] === false;
+            setFeedback(!hadMistake, "");
+          }
+        } else {
+          el.classList.add("locked-bad"); leftEl.classList.add("locked-bad");
+          leftEl.classList.remove("selected");
+          state.results[idx] = false; drawDots();
+          setTimeout(() => { el.classList.remove("locked-bad"); leftEl.classList.remove("locked-bad"); }, 600);
+        }
+        selLeft = null;
+      }
+      renderEngine.reset = () => {
+        selLeft = null; matched = 0;
+        feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none";
+        engineTranslateMatch();
+      };
+    }
+
     switch (task.type) {
       case "multiple-choice": engineMC(); break;
       case "true-false": engineTF(); break;
       case "gap-fill": engineGap(); break;
       case "word-order": engineWO(); break;
       case "matching": engineMatch(); break;
+      case "choose-odd-one-out": engineOdd(); break;
+      case "find-and-click": engineFindClick(); break;
+      case "click-on-picture": enginePicture(); break;
+      case "word-search": engineWordSearch(); break;
+      case "translate-match": engineTranslateMatch(); break;
       default:
         body.innerHTML = `<div class="error-box">Task type \u201c${esc(task.type)}\u201d is not supported yet.</div>`;
         if (btnNext) btnNext.disabled = false;
