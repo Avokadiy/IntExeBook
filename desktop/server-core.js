@@ -390,6 +390,58 @@ function loadBookTree(idOrFolder, slot) {
   return book;
 }
 
+/* Quick search across every textbook / unit / lesson / task title. */
+function searchAll(query) {
+  const tokens = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return [];
+  const matches = (text) => {
+    const low = String(text || "").toLowerCase();
+    return tokens.every(t => low.includes(t));
+  };
+  const enc = encodeURIComponent;
+  const results = [];
+  for (const card of scanTextbooks()) {
+    if (card.error) continue;
+    const tbHash = `#/tb/${enc(card.folder)}`;
+    if (matches(card.title) || matches(card.subtitle) || matches(card.level) || matches(card.description)) {
+      results.push({ kind: "textbook", icon: card.icon || "📕", title: card.title,
+                     subtitle: card.subtitle || card.level || "", hash: tbHash });
+    }
+    const folder = path.join(TEXTBOOKS_DIR, card.folder);
+    const mp = findManifest(folder);
+    if (!mp) continue;
+    const manifest = readManifest(mp);
+    for (const slot of ["student", "workbook"]) {
+      if (!manifest[slot]) continue;
+      let book;
+      try { book = loadBook(folder, manifest, slot); } catch (exc) { continue; }
+      const bookLabel = book.book_label || slot;
+      for (const unit of book.units || []) {
+        const uHash = `${tbHash}/${slot}/${enc(unit.id)}`;
+        if (matches(unit.title)) results.push({ kind: "unit", icon: "📚", title: unit.title,
+          subtitle: `${card.title} · ${bookLabel}`, hash: uHash });
+        for (const lesson of unit.lessons || []) {
+          const lHash = `${uHash}/${enc(lesson.id)}`;
+          if (matches(lesson.title)) results.push({ kind: "lesson", icon: "📖", title: lesson.title,
+            subtitle: `${card.title} · ${unit.title} · ${bookLabel}`, hash: lHash });
+          for (const task of lesson.tasks || []) {
+            if (matches(task.title)) results.push({ kind: "task",
+              icon: TYPE_ICONS[task.type] || "⭐", title: task.title,
+              subtitle: `${card.title} · ${lesson.title} · ${bookLabel}`,
+              hash: `${lHash}/play/${enc(task.id)}` });
+          }
+        }
+      }
+    }
+    if (results.length >= 60) break;
+  }
+  return results.slice(0, 60);
+}
+const TYPE_ICONS = {
+  "multiple-choice": "🔤", "true-false": "☑️", "gap-fill": "✏️",
+  "word-order": "🧩", "matching": "🔗",
+};
+
 /* Load a single full task object. */
 function loadTaskFull(idOrFolder, slot, unitId, lessonId, taskId) {
   const { folder, manifest } = resolveTextbook(idOrFolder);
@@ -407,6 +459,7 @@ const MIME = {
   ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
   ".gif": "image/gif", ".webp": "image/webp", ".mp3": "audio/mpeg", ".wav": "audio/wav",
   ".ogg": "audio/ogg", ".m4a": "audio/mp4", ".ico": "image/x-icon",
+  ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
 };
 
 function sendJson(res, obj, status = 200) {
@@ -415,14 +468,35 @@ function sendJson(res, obj, status = 200) {
   res.end(body);
 }
 
-function sendFile(res, file) {
+function sendFile(res, file, req) {
   if (!fs.existsSync(file) || !fs.statSync(file).isFile()) {
     return sendJson(res, { error: "Not found" }, 404);
   }
+  const ctype = MIME[path.extname(file).toLowerCase()] || "application/octet-stream";
+  const size = fs.statSync(file).size;
+  const rng = req && req.headers && req.headers.range;
+  if (rng && /^bytes=\d*-\d*$/.test(rng)) {
+    let [startS, endS] = rng.slice(6).split("-");
+    let start = startS === "" ? 0 : parseInt(startS, 10);
+    let end = endS === "" || endS === undefined ? size - 1 : Math.min(parseInt(endS, 10), size - 1);
+    if (start <= end && start < size) {
+      const body = Buffer.alloc(end - start + 1);
+      const fd = fs.openSync(file, "r");
+      fs.readSync(fd, body, 0, body.length, start);
+      fs.closeSync(fd);
+      res.writeHead(206, {
+        "Content-Type": ctype, "Content-Length": body.length,
+        "Content-Range": `bytes ${start}-${end}/${size}`,
+        "Accept-Ranges": "bytes", "Cache-Control": "no-cache",
+      });
+      return res.end(body);
+    }
+  }
   const body = fs.readFileSync(file);
   res.writeHead(200, {
-    "Content-Type": MIME[path.extname(file).toLowerCase()] || "application/octet-stream",
+    "Content-Type": ctype,
     "Content-Length": body.length, "Cache-Control": "no-cache",
+    "Accept-Ranges": "bytes",
   });
   res.end(body);
 }
@@ -431,11 +505,11 @@ function handle(req, res) {
   try {
     const url = new URL(req.url, "http://localhost");
     const pathname = decodeURIComponent(url.pathname);
-    if (pathname === "/" || pathname === "/index.html") return sendFile(res, path.join(WEB_DIR, "index.html"));
+    if (pathname === "/" || pathname === "/index.html") return sendFile(res, path.join(WEB_DIR, "index.html"), req);
     if (pathname.startsWith("/static/")) {
       const rel = path.normalize(pathname.slice("/static/".length));
       if (rel.startsWith("..") || path.isAbsolute(rel)) return sendJson(res, { error: "Bad request" }, 400);
-      return sendFile(res, path.join(WEB_DIR, rel));
+      return sendFile(res, path.join(WEB_DIR, rel), req);
     }
     // also serve web/ files by plain relative name so index.html can use the
     // same <link href="style.css"> as in file:// mode
@@ -443,7 +517,7 @@ function handle(req, res) {
       const direct = path.normalize(pathname.slice(1));
       if (direct && !direct.startsWith("..") && fs.existsSync(path.join(WEB_DIR, direct)) &&
           fs.statSync(path.join(WEB_DIR, direct)).isFile()) {
-        return sendFile(res, path.join(WEB_DIR, direct));
+        return sendFile(res, path.join(WEB_DIR, direct), req);
       }
     }
     const parts = pathname.split("/").filter(Boolean);
@@ -451,6 +525,10 @@ function handle(req, res) {
       return sendJson(res, { ok: true, engine: "node" });
     }
     if (parts.join("/") === "api/textbooks") return sendJson(res, { textbooks: scanTextbooks() });
+    if (parts.length === 2 && parts[0] === "api" && parts[1] === "search") {
+      const q = url.searchParams.get("q") || "";
+      return sendJson(res, { results: searchAll(q) });
+    }
     if (parts.length === 5 && parts[0] === "api" && parts[1] === "textbooks" && parts[3] === "book") {
       return sendJson(res, loadBookTree(parts[2], parts[4]));
     }
@@ -460,7 +538,7 @@ function handle(req, res) {
     }
     if (parts[0] === "assets" && parts.length >= 3) {
       const { folder } = getTextbookMeta(parts[1]);
-      return sendFile(res, safeJoin(folder, "assets", ...parts.slice(2)));
+      return sendFile(res, safeJoin(folder, "assets", ...parts.slice(2)), req);
     }
     return sendJson(res, { error: "Unknown endpoint" }, 404);
   } catch (exc) {

@@ -44,6 +44,7 @@ import os
 import shutil
 import tarfile
 import tempfile
+import urllib.parse
 import zipfile
 from typing import Any, Optional
 
@@ -414,3 +415,84 @@ def find_task(book: dict, unit_id: str, lesson_id: str, task_id: str) -> dict:
 
 def asset_path(folder: str, rel: str) -> str:
     return _safe_join(folder, "assets", rel)
+
+
+# --------------------------------------------------------------------------- #
+# quick search across all textbooks
+# --------------------------------------------------------------------------- #
+_TYPE_ICONS = {
+    "multiple-choice": "🔤", "true-false": "☑️", "gap-fill": "✏️",
+    "word-order": "🧩", "matching": "🔗",
+}
+
+
+def search_all(query: str, limit: int = 60) -> list:
+    """Case-insensitive substring search over every textbook / unit / lesson /
+    task title.  Returns a flat list of result dicts with ready-to-use hashes."""
+    tokens = [t for t in query.lower().split() if t]
+    if not tokens:
+        return []
+
+    def matches(text: str) -> bool:
+        low = (text or "").lower()
+        return all(t in low for t in tokens)
+
+    results = []
+    for card in scan_textbooks():
+        if card.get("error"):
+            continue
+        tb_hash = "#/tb/%s" % urllib.parse.quote(str(card["folder"]))
+        tb_hit = matches(card.get("title", "")) or matches(card.get("subtitle", "")) \
+            or matches(card.get("level", "")) or matches(card.get("description", ""))
+        if tb_hit:
+            results.append({
+                "kind": "textbook", "icon": card.get("icon") or "📕",
+                "title": card.get("title", ""),
+                "subtitle": card.get("subtitle") or card.get("level") or "",
+                "hash": tb_hash,
+            })
+        folder = os.path.join(TEXTBOOKS_DIR, card["folder"])
+        mpath = _find_manifest(folder)
+        if not mpath:
+            continue
+        manifest = _read_manifest(mpath)
+        for slot in ("student", "workbook"):
+            if not manifest.get(slot):
+                continue
+            try:
+                book = load_book(folder, manifest, slot)
+            except TextbookError:
+                continue
+            book_label = book.get("book_label") or slot
+            for unit in book.get("units", []):
+                u_hash = "%s/%s/%s" % (tb_hash, slot, urllib.parse.quote(str(unit.get("id"))))
+                if matches(unit.get("title", "")):
+                    results.append({
+                        "kind": "unit", "icon": "📚",
+                        "title": unit.get("title", ""),
+                        "subtitle": "%s · %s" % (card.get("title", ""), book_label),
+                        "hash": u_hash,
+                    })
+                for lesson in unit.get("lessons", []):
+                    l_hash = "%s/%s" % (u_hash, urllib.parse.quote(str(lesson.get("id"))))
+                    if matches(lesson.get("title", "")):
+                        results.append({
+                            "kind": "lesson", "icon": "📖",
+                            "title": lesson.get("title", ""),
+                            "subtitle": "%s · %s · %s" % (card.get("title", ""),
+                                                          unit.get("title", ""), book_label),
+                            "hash": l_hash,
+                        })
+                    for task in lesson.get("tasks", []):
+                        if matches(task.get("title", "")):
+                            results.append({
+                                "kind": "task",
+                                "icon": _TYPE_ICONS.get(task.get("type"), "⭐"),
+                                "title": task.get("title", ""),
+                                "subtitle": "%s · %s · %s" % (card.get("title", ""),
+                                                              lesson.get("title", ""), book_label),
+                                "hash": "%s/play/%s" % (l_hash, urllib.parse.quote(str(task.get("id")))),
+                            })
+        if len(results) >= limit:
+            break
+    return results[:limit]

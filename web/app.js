@@ -142,6 +142,81 @@ async function loadTask(tbId, slot, unitId, lessonId, taskId) {
 function findUnit(book, unitId) { return book.units.find(u => u.id === unitId); }
 function findLesson(unit, lessonId) { return (unit.lessons || []).find(l => l.id === lessonId); }
 
+/* ------------------------------------------------------------ quick search */
+async function runSearch(query) {
+  if (FILE_MODE) {
+    // no server: build a tiny index from the book trees and filter it locally
+    const data = await loadFileModeIndex();
+    const tokens = query.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!tokens.length) return [];
+    const hit = t => tokens.every(x => String(t || "").toLowerCase().includes(x));
+    const enc = encodeURIComponent;
+    const out = [];
+    for (const tb of data.textbooks) {
+      const tbHash = `#/tb/${enc(tb.folder || tb.id)}`;
+      if (hit(tb.title) || hit(tb.subtitle) || hit(tb.level))
+        out.push({ kind: "textbook", icon: tb.icon || "📕", title: tb.title, subtitle: tb.subtitle || "", hash: tbHash });
+      for (const slot of ["student", "workbook"]) {
+        if (!tb[slot]) continue;
+        let book;
+        try { book = await loadBook(tb.folder || tb.id, slot); } catch (e) { continue; }
+        for (const u of book.units || []) {
+          const uHash = `${tbHash}/${slot}/${enc(u.id)}`;
+          if (hit(u.title)) out.push({ kind: "unit", icon: "📚", title: u.title, subtitle: `${tb.title} · ${book.book_label}`, hash: uHash });
+          for (const l of u.lessons || []) {
+            const lHash = `${uHash}/${enc(l.id)}`;
+            if (hit(l.title)) out.push({ kind: "lesson", icon: "📖", title: l.title, subtitle: `${tb.title} · ${u.title} · ${book.book_label}`, hash: lHash });
+            for (const t of l.tasks || [])
+              if (hit(t.title)) out.push({ kind: "task", icon: TYPE_ICONS[t.type] || "⭐", title: t.title, subtitle: `${tb.title} · ${l.title} · ${book.book_label}`, hash: `${lHash}/play/${enc(t.id)}` });
+          }
+        }
+      }
+    }
+    return out.slice(0, 60);
+  }
+  const res = await getJSON("/api/search?q=" + encodeURIComponent(query));
+  return res.results || [];
+}
+
+let searchTimer = null;
+function initSearch() {
+  const input = document.getElementById("searchBox");
+  const box = document.getElementById("searchResults");
+  if (!input || !box) return;
+  function close() { box.classList.add("hidden"); }
+  async function run() {
+    const q = input.value.trim();
+    if (q.length < 2) return close();
+    let results;
+    try { results = await runSearch(q); }
+    catch (e) {
+      box.innerHTML = `<div class="sr-empty">Search needs the local server — start the app with <b>start.bat</b>.</div>`;
+      box.classList.remove("hidden");
+      return;
+    }
+    if (!results.length) {
+      box.innerHTML = `<div class="sr-empty">Nothing found for “${esc(q)}”.</div>`;
+      box.classList.remove("hidden");
+      return;
+    }
+    box.innerHTML = "";
+    results.forEach(r => {
+      const item = document.createElement("button");
+      item.className = "sr-item";
+      item.innerHTML = `<span class="sr-icon">${esc(r.icon)}</span>
+        <span><span class="sr-title">${esc(r.title)}</span>
+        <span class="sr-sub">${esc(r.kind)} · ${esc(r.subtitle)}</span></span>`;
+      item.onclick = () => { navigate(r.hash); close(); input.value = ""; input.blur(); };
+      box.appendChild(item);
+    });
+    box.classList.remove("hidden");
+  }
+  input.addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(run, 150); });
+  input.addEventListener("focus", () => { if (input.value.trim().length >= 2) run(); });
+  input.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+  document.addEventListener("click", e => { if (!box.contains(e.target) && e.target !== input) close(); });
+}
+
 /* ============================================================ Step 1 */
 
 /* ---- textbook list for file:// mode (no local server available) ----
@@ -314,7 +389,7 @@ async function viewLessons(tbId, slot, unitId) {
 }
 
 /* ============================================================ Step 4: tasks */
-const TYPE_ICONS = {
+var TYPE_ICONS = {
   "multiple-choice": "🔤", "true-false": "☑️", "gap-fill": "✏️",
   "word-order": "🧩", "matching": "🔗",
 };

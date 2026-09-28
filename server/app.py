@@ -29,6 +29,8 @@ mimetypes.add_type("application/javascript", ".js")
 mimetypes.add_type("audio/mpeg", ".mp3")
 mimetypes.add_type("audio/wav", ".wav")
 mimetypes.add_type("audio/ogg", ".ogg")
+mimetypes.add_type("video/mp4", ".mp4")
+mimetypes.add_type("video/webm", ".webm")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -51,10 +53,31 @@ class Handler(BaseHTTPRequestHandler):
         ctype, _ = mimetypes.guess_type(path)
         with open(path, "rb") as fh:
             body = fh.read()
-        self.send_response(200)
-        self.send_header("Content-Type", ctype or "application/octet-stream")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-cache")
+        # support HTTP Range requests so <video>/<audio> seeking works
+        headers = [("Content-Type", ctype or "application/octet-stream"),
+                   ("Content-Length", str(len(body))),
+                   ("Cache-Control", "no-cache"),
+                   ("Accept-Ranges", "bytes")]
+        status = 200
+        rng = self.headers.get("Range")
+        if rng and rng.startswith("bytes="):
+            try:
+                start_s, _, end_s = rng[6:].partition("-")
+                start = int(start_s) if start_s else 0
+                end = int(end_s) if end_s else len(body) - 1
+                end = min(end, len(body) - 1)
+                if start <= end:
+                    body = body[start:end + 1]
+                    status = 206
+                    headers = [("Content-Type", ctype or "application/octet-stream"),
+                               ("Content-Length", str(len(body))),
+                               ("Content-Range", "bytes %d-%d/%d" % (start, end, os.path.getsize(path))),
+                               ("Accept-Ranges", "bytes")]
+            except ValueError:
+                pass
+        self.send_response(status)
+        for k, v in headers:
+            self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
@@ -115,6 +138,11 @@ class Handler(BaseHTTPRequestHandler):
                 task["book_label"] = book.get("book_label")
                 task["textbook_title"] = book.get("textbook_title")
                 return self._send_json(task)
+
+            # GET /api/search?q=<query>               -> quick search across all books
+            if parts == ["api", "search"]:
+                query = urllib.parse.parse_qs(parsed.query).get("q", [""])[0]
+                return self._send_json({"results": loader.search_all(query)})
 
             # GET /assets/<textbook-id>/<file...>      -> textbook assets
             if parts and parts[0] == "assets" and len(parts) >= 3:
