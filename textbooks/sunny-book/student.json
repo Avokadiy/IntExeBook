@@ -1,0 +1,155 @@
+{
+  "units": [
+    {
+      "id": "u1",
+      "title": "Unit 1 — Hello!",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Lesson 1 — Greetings",
+          "page": 2,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "multiple-choice",
+              "title": "Choose the right response",
+              "instruction": "Someone says “Hello, I'm Mike.” What do you say?",
+              "options": [
+                "Goodbye!",
+                "Hi, I'm Sarah.",
+                "Thank you.",
+                "You're welcome."
+              ],
+              "answerIndex": 1
+            },
+            {
+              "id": "t2",
+              "type": "word-order",
+              "title": "Make a sentence",
+              "instruction": "Put the words in the correct order.",
+              "words": ["am", "I", "Chen", "Jie"],
+              "answer": "I am Chen Jie"
+            },
+            {
+              "id": "t3",
+              "type": "matching",
+              "title": "Match the halves",
+              "instruction": "Match each greeting with its reply.",
+              "pairs": [
+                { "left": "Hello!", "right": "Hello!" },
+                { "left": "How are you?", "right": "I'm fine, thanks." },
+                { "left": "What's your name?", "right": "My name is John." },
+                { "left": "Goodbye!", "right": "Bye!" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "l2",
+          "title": "Lesson 2 — Your name",
+          "page": 4,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "true-false",
+              "title": "Read and decide",
+              "instruction": "“My name is Wu Binbin.” — True or false: the speaker is telling you their age.",
+              "answer": false,
+              "explanation": "The speaker is telling their NAME, not their age."
+            },
+            {
+              "id": "t2",
+              "type": "gap-fill",
+              "title": "Complete the dialogue",
+              "instruction": "Type the missing word.",
+              "text": "A: What's ___ name?  B: His name is Zhang Peng.",
+              "blanks": [{ "answers": ["his"], "hint": "possessive adjective for a boy" }]
+            },
+            {
+              "id": "t3",
+              "type": "multiple-choice",
+              "title": "Introduce yourself",
+              "instruction": "Which sentence is correct?",
+              "options": [
+                "Me name is Tom.",
+                "My name is Tom.",
+                "I name Tom.",
+                "Mine name is Tom."
+              ],
+              "answerIndex": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u2",
+      "title": "Unit 2 — Colours",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Lesson 1 — Rainbow words",
+          "page": 8,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "multiple-choice",
+              "title": "What colour is it?",
+              "instruction": "The flag of China is …",
+              "options": ["green", "red", "blue", "white"],
+              "answerIndex": 1
+            },
+            {
+              "id": "t2",
+              "type": "matching",
+              "title": "Colours & things",
+              "instruction": "Match the colour with something that is usually this colour.",
+              "pairs": [
+                { "left": "Yellow", "right": "a banana" },
+                { "left": "Green", "right": "grass" },
+                { "left": "Blue", "right": "the sky" },
+                { "left": "Orange", "right": "an orange" }
+              ]
+            },
+            {
+              "id": "t3",
+              "type": "word-order",
+              "title": "Mix the colours",
+              "instruction": "Put the words in order.",
+              "words": ["Red", "and", "blue", "is", "purple"],
+              "answer": "Red and blue is purple"
+            }
+          ]
+        },
+        {
+          "id": "l2",
+          "title": "Lesson 2 — I see red",
+          "page": 10,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "gap-fill",
+              "title": "Fill in the gaps",
+              "instruction": "Use: brown, pink, black, grey",
+              "text": "1. A panda is ___ and white.  2. The colour of chocolate is ___.  3. A pig is often ___.  4. A cloud on a rainy day is ___.",
+              "blanks": [
+                { "answers": ["black"], "hint": "part 1 of a panda" },
+                { "answers": ["brown"], "hint": "chocolate" },
+                { "answers": ["pink"], "hint": "a pig" },
+                { "answers": ["grey", "gray"], "hint": "a rainy cloud" }
+              ]
+            },
+            {
+              "id": "t2",
+              "type": "true-false",
+              "title": "Colour facts",
+              "instruction": "Bananas are blue.",
+              "answer": false,
+              "explanation": "Bananas are yellow."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

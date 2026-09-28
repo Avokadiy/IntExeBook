@@ -203,17 +203,87 @@ def _fix_zip_name(info: zipfile.ZipInfo) -> str:
     return fixed if fixed != name else name
 
 
-def _extract_zip(archive: str, target: str) -> None:
-    with zipfile.ZipFile(archive) as zf:
-        infos = {i: _fix_zip_name(i) for i in zf.infolist()}
-        names = [(i, n) for i, n in infos.items() if not n.startswith("__MACOSX")]
-        for member, n in names:
-            if member.is_dir():
+def _zip_recover(archive: str, target: str) -> bool:
+    """Walk local file headers (PK\\3\\4) directly and extract every readable
+    member.  Works even when the central directory at the tail of the .zip is
+    corrupted or stores bogus data offsets.  Returns True on any success."""
+    try:
+        with open(archive, "rb") as fh:
+            buf = fh.read()
+    except OSError:
+        return False
+    wrote_any = False
+    for name, method, start, comp, uncomp in _iter_local_headers(buf):
+        if not name or name.startswith("__MACOSX"):
+            continue
+        data = buf[start:start + comp]
+        if method == 8:
+            import zlib
+            try:
+                data = zlib.decompress(data, -15)
+            except zlib.error:
                 continue
-            dest = _safe_join(target, *n.split("/"))
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            with zf.open(member) as src, open(dest, "wb") as out:
-                shutil.copyfileobj(src, out)
+        elif method != 0:
+            continue
+        try:
+            dest = _safe_join(target, *name.split("/"))
+        except TextbookError:
+            continue
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, "wb") as fh:
+            fh.write(data)
+        wrote_any = True
+    return wrote_any
+
+
+def _extract_zip(archive: str, target: str) -> None:
+    extracted = False
+    try:
+        with zipfile.ZipFile(archive) as zf:
+            infos = {i: _fix_zip_name(i) for i in zf.infolist()}
+            names = [(i, n) for i, n in infos.items() if not n.startswith("__MACOSX")]
+            for member, n in names:
+                if member.is_dir():
+                    continue
+                try:
+                    dest = _safe_join(target, *n.split("/"))
+                except TextbookError:
+                    continue
+                try:
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    with zf.open(member) as src, open(dest, "wb") as out:
+                        shutil.copyfileobj(src, out)
+                    extracted = True
+                except (OSError, zipfile.BadZipFile):
+                    # central directory lies about this entry's data offset —
+                    # handled by the recovery pass below
+                    pass
+    except zipfile.BadZipFile:
+        pass  # fully damaged central directory — rely on recovery below
+
+    # A healthy zip yields a manifest; if we cannot find one, some entries were
+    # skipped by the normal path — re-extract everything from raw local headers.
+    if not _find_manifest_deep(target):
+        if _zip_recover(archive, target) and _find_manifest_deep(target):
+            return
+        if not extracted:
+            raise TextbookError("Could not read '%s' — the archive looks damaged."
+                                % os.path.basename(archive))
+
+
+def _find_manifest_deep(folder: str) -> Optional[str]:
+    """Manifest search that also descends into a single root folder created by
+    archive extraction (e.g. sunny-book.zip/Учебник Пример/manifest.json)."""
+    if not os.path.isdir(folder):
+        return None
+    direct = _find_manifest(folder)
+    if direct:
+        return direct
+    entries = [e for e in os.listdir(folder) if not e.startswith(".")
+               and os.path.isdir(os.path.join(folder, e))]
+    if len(entries) == 1:
+        return _find_manifest(os.path.join(folder, entries[0]))
+    return None
 
 
 # --------------------------------------------------------------------------- #
@@ -985,7 +1055,7 @@ def scan_textbooks() -> list[dict]:
             "publisher": manifest.get("publisher", ""),
             "icon": manifest.get("icon", ""),
             "author": manifest.get("author", ""),
-            "source": manifest.get("source", "") or ("shared" if base_dir == SHARED_DIR else ""),
+            "source": manifest.get("source", ""),
             "books": books,
         })
     # published teacher courses: shared-exercises/<course>/ has the very same
