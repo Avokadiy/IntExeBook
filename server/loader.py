@@ -168,11 +168,31 @@ def _safe_join(base: str, *parts: str) -> str:
     return dest
 
 
+def _fix_zip_name(info: zipfile.ZipInfo) -> str:
+    """Recover UTF-8 filenames from archives created without the UTF-8 flag
+    (e.g. Windows Explorer zips with Cyrillic names). Python decodes such
+    names as cp437; re-decoding the bytes as UTF-8 restores them."""
+    name = info.filename.replace("\\", "/")
+    if info.flag_bits & 0x800:          # proper UTF-8 flag set – trust it
+        return name
+    if not any(ord(c) > 127 for c in name):
+        return name                      # plain ASCII – nothing to fix
+    try:
+        raw = name.encode("cp437")
+    except UnicodeEncodeError:
+        return name
+    try:
+        fixed = raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return name
+    return fixed if fixed != name else name
+
+
 def _extract_zip(archive: str, target: str) -> None:
     with zipfile.ZipFile(archive) as zf:
-        names = [n for n in zf.namelist() if not n.startswith("__MACOSX")]
-        for n in names:
-            member = zf.getinfo(n)
+        infos = {i: _fix_zip_name(i) for i in zf.infolist()}
+        names = [(i, n) for i, n in infos.items() if not n.startswith("__MACOSX")]
+        for member, n in names:
             if member.is_dir():
                 continue
             dest = _safe_join(target, *n.split("/"))
