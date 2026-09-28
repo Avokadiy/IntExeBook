@@ -145,6 +145,15 @@ class Handler(BaseHTTPRequestHandler):
 
             parts = [p for p in path.split("/") if p]
 
+            # GET /shared-packs/<file>.iebpack.json  -> download a share pack
+            if len(parts) == 2 and parts[0] == "shared-packs":
+                fname = os.path.basename(parts[1])
+                fp = os.path.join(loader.SHARED_DIR, fname)
+                if (fname.endswith(loader.PACK_EXT) or fname.endswith(".json")) \
+                        and os.path.isfile(fp):
+                    return self._send_file(fp)
+                return self._send_json({"error": "Pack not found"}, 404)
+
             # GET /api/ping                            -> health check
             if parts == ["api", "ping"]:
                 return self._send_json({"ok": True, "engine": "python"})
@@ -288,6 +297,12 @@ class Handler(BaseHTTPRequestHandler):
             if parts == ["api", "textbooks"]:
                 return self._send_json(loader.create_textbook(body))
 
+            # POST /api/publish                       -> publish into shared-exercises/
+            if parts == ["api", "publish"]:
+                res = loader.publish_course(body)
+                res["pack_url"] = "/shared-packs/" + urllib.parse.quote(res["pack_name"])
+                return self._send_json(res)
+
             # POST /api/import                        -> install a shared pack
             if parts == ["api", "import"]:
                 pack = body.get("pack") if isinstance(body.get("pack"), dict) else body
@@ -345,11 +360,13 @@ def main() -> None:
     args = ap.parse_args()
 
     os.makedirs(loader.TEXTBOOKS_DIR, exist_ok=True)
+    os.makedirs(loader.SHARED_DIR, exist_ok=True)
     httpd = ThreadingHTTPServer((args.host, args.port), Handler)
     url = "http://%s:%d" % (args.host, args.port)
     print("=" * 60)
     print("  IntExeBook is running:  %s" % url)
     print("  Drop textbook folders or archives into:  ./textbooks")
+    print("  Published teacher courses & share packs: ./shared-exercises")
     print("  Press Ctrl+C to stop.")
     print("=" * 60)
     try:

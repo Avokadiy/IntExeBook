@@ -158,19 +158,25 @@
     app.innerHTML = `
       <section>
         <div class="hero">
-          <h1>Create your own exercises</h1>
-          <p>Build interactive tasks in minutes — attach them to a textbook unit,
-             a lesson, or keep them as a standalone course. Then share the whole
-             pack with colleagues as a single file.</p>
+          <h1>Create &amp; share exercises</h1>
+          <p>Every finished course lives in its own folder under
+             <code>shared-exercises/&lt;course&gt;/</code> and is handed to
+             colleagues as a single self-contained pack file — no hunting for
+             who made what and where.</p>
         </div>
         <div class="grid" id="createGrid"></div>
+        <h2 class="step-title"><span class="stepnum">⬇</span> Ready to publish</h2>
+        <div class="lesson-list" id="publishedList"><div class="loading">Loading…</div></div>
         <h2 class="step-title"><span class="stepnum">·</span> Saved drafts</h2>
         <div class="lesson-list" id="draftList"><div class="loading">Loading…</div></div>
         <div class="hint-card">
-          <strong>💡 Sharing:</strong> every course can be exported to a
-          <code>*.iebpack.json</code> file (tasks + media in one file). A colleague
-          opens it via <b>Import pack</b> — everything installs into their
-          <code>textbooks/</code> folder automatically.
+          <strong>📦 How sharing works:</strong> when you press <b>Publish</b>, the
+          course is saved into <code>shared-exercises/&lt;course&gt;/</code> — a
+          normal textbook folder (manifest.json, student.json, assets/) that also
+          produces <code>&lt;course&gt;.iebpack.json</code>: one file with all
+          tasks <i>and</i> media inside. Send that file by chat / e-mail / USB —
+          a colleague imports it and the course lands in their library instantly.
+          Teachers editing different textbooks never touch each other's folders.
         </div>
       </section>`;
 
@@ -189,6 +195,37 @@
       card.onclick = c.act;
       grid.appendChild(card);
     });
+
+    /* published courses living in shared-exercises/ */
+    const pub = document.getElementById("publishedList");
+    try {
+      const list = await loadAllTextbooks();
+      const mine = list.filter(tb => tb.source === "shared");
+      if (!mine.length) {
+        pub.innerHTML = `<div class="meta" style="color:var(--muted)">Nothing published yet — finish a course and press “Publish”, it will appear here.</div>`;
+      } else {
+        pub.innerHTML = "";
+        mine.forEach(tb => {
+          const row = h("div", { class: "lesson-row" }, [
+            h("div", null, [
+              h("strong", { style: "font-size:16px" }, (tb.icon || "📦") + " " + tb.title),
+              h("div", { class: "meta" }, "shared-exercises/" + (tb.folder || tb.id) + (tb.level ? " · " + tb.level : "")),
+            ]),
+            h("div", { style: "display:flex;gap:8px" }, [
+              rowBtn("Open", () => { location.hash = "#/tb/" + encodeURIComponent(tb.folder || tb.id); }),
+              rowBtn("Edit", () => { location.hash = "#/edit/book/" + encodeURIComponent(tb.folder || tb.id) + "/student"; }),
+              (() => { const b = rowBtn("📤 Pack", async () => {
+                b.disabled = true; b.textContent = "…";
+                try { await downloadPackFor(tb.folder || tb.id, tb.title); }
+                catch (e) { toast("Export failed: " + e.message, "bad"); }
+                finally { b.disabled = false; b.textContent = "📤 Pack"; }
+              }); return b; })(),
+            ]),
+          ]);
+          pub.appendChild(row);
+        });
+      }
+    } catch (e) { pub.innerHTML = `<div class="meta" style="color:var(--muted)">Could not list published courses (${esc(e.message || e)}).</div>`; }
 
     const list = document.getElementById("draftList");
     let drafts = [];
@@ -503,6 +540,61 @@
 
   function slotLabel(slot) { return slot === "workbook" ? "Workbook" : "Student's Book"; }
 
+  /* ---------------------------------------------------- PUBLISH to shared-exercises/
+     One click puts the course into its own folder shared-exercises/<course>/
+     AND writes <course>.iebpack.json next to it — a single file that can be
+     sent to anyone (chat / e-mail / USB). They import it and the course shows
+     up in their library with the author's name. */
+  async function publishCourse() {
+    if (!session) return;
+    const built = buildSavePayload();
+    if (built.errors) {
+      toast("Please fix " + built.errors.length + " problem(s) first", "bad");
+      showValidation(built.errors, []);
+      return;
+    }
+    const manifest = Object.assign({}, session.manifest);
+    manifest[session.slot] = manifest[session.slot] || slotLabel(session.slot);
+    if (session.inplace) {
+      // editing an installed book → publishing makes a standalone shared copy
+      manifest.id = S.slugify(manifest.title || "course") + "-shared";
+    }
+    if (FILE_MODE) {
+      downloadPackFor(null, null, { manifest, books: built.payload.books, assets: session.assets });
+      toast("Server is not running — downloaded the pack file instead. Start server.py to publish into shared-exercises/.", "warn");
+      return;
+    }
+    try {
+      const res = await api("POST", "/api/publish", { manifest, books: built.payload.books, assets: session.assets });
+      invalidateCaches();
+      if (session) { session.publishedTo = res.folder; lsDelDraft(session.draftName); }
+      openModal(modal("📦 Published!", [
+        h("p", null, ["Course ", h("strong", null, "“" + res.title + "”"), " is now in your library and saved as a shareable package:"]),
+        h("div", { class: "ed-path" }, "shared-exercises/" + res.folder + "/"),
+        h("p", { class: "ed-help" }, "The whole folder can be copied to a colleague as-is, but the easiest way is the single pack file:"),
+        h("div", { class: "ed-path" }, "shared-exercises/" + res.pack_name),
+        h("p", { class: "ed-help" }, "Send that one file by chat / e-mail / flash drive — your colleague opens it via “Import pack”."),
+      ], [
+        btn("⬇ Download pack file", "btn-primary", () => { location.href = API(res.pack_url); }),
+        btn("Open course", "btn-ghost", () => { closeModal(); location.hash = "#/tb/" + encodeURIComponent(res.folder); }),
+        btn("Close", "btn-ghost", closeModal),
+      ]));
+    } catch (e) { toast("Publish failed: " + e.message, "bad"); }
+  }
+
+  /* download (or build locally) the .iebpack.json for a published course */
+  async function downloadPackFor(tbId, title, inlinePack) {
+    let packObj = inlinePack || null;
+    if (!packObj && tbId) {
+      const res = await fetch(API("/api/textbooks/" + encodeURIComponent(tbId) + "/export"));
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      packObj = await res.json();
+    }
+    if (!packObj) throw new Error("nothing to export");
+    const name = S.slugify((packObj.manifest && packObj.manifest.title) || title || "course");
+    download(name + ".iebpack.json", JSON.stringify(packObj));
+  }
+
   /* ---------------------------------------------------- EXPORT PACK */
   async function exportPack() {
     if (!session) return;
@@ -619,7 +711,8 @@
         h("span", { id: "edSaveState", class: "ed-state" }, "✓ autosaved"),
         btn("Course settings", "btn-ghost", editSettings),
         btn("Share / export", "btn-ghost", exportDialog),
-        btn("💾 Save", "btn-primary", () => saveSession(false)),
+        btn(session.inplace ? "💾 Save" : "💾 Save draft", "btn-ghost", () => saveSession(false)),
+        btn("📦 Publish & share", "btn-primary", publishCourse),
       ]),
     ]);
 
@@ -656,7 +749,8 @@
       btn("← Back to textbooks", "btn-ghost", () => { location.hash = "#/"; }),
       h("div", { style: "display:flex;gap:10px" }, [
         btn("Share / export", "btn-ghost", exportDialog),
-        btn(session.inplace ? "💾 Save changes" : "💾 Publish course", "btn-primary", () => saveSession(false)),
+        btn(session.inplace ? "💾 Save changes" : "💾 Save draft", "btn-ghost", () => saveSession(false)),
+        btn("📦 Publish & share", "btn-primary", publishCourse),
       ]),
     ]);
     main.appendChild(saveRow);
@@ -866,8 +960,8 @@
     if (built.errors) lines.push(h("div", { class: "error-box" }, "Fix " + built.errors.length + " problem(s) before exporting."));
     if (session.inplace) lines.push(h("div", { class: "hint-card" }, "Tip: this course is currently attached to the installed book “" + esc((session.target && session.target.tbTitle) || "") + "”. Exporting creates a standalone copy."));
     openModal(modal("Share this course", lines, [
-      btn("📤 Download .iebpack.json", "btn-primary", exportPack),
-      btn("🔗 Copy as text", "btn-ghost", shareLink),
+      btn("📦 Publish & share", "btn-primary", publishCourse),
+      btn("📤 Download .iebpack.json", "btn-ghost", exportPack),
       btn("Close", "btn-ghost", closeModal),
     ]));
   }

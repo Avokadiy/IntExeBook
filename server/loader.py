@@ -54,6 +54,14 @@ TEXTBOOKS_DIR = os.environ.get("IEB_TEXTBOOKS") or os.path.join(ROOT, "textbooks
 # where drafts of teacher-made courses are kept (autosave / restore)
 DRAFTS_DIR = os.environ.get("IEB_DRAFTS") or os.path.join(TEXTBOOKS_DIR, "_drafts")
 
+# PUBLISHED SHARING FOLDER -------------------------------------------------
+# Teacher-made courses that are ready to be handed out live in their own
+# folder next to the app:  shared-exercises/<course>/  (same textbook layout:
+# manifest.json + student.json/workbook.json + assets/).  The whole folder is
+# copy-paste shareable, and every course additionally gets a one-file pack
+# <course>.iebpack.json written next to it for chat / e-mail / USB sharing.
+SHARED_DIR = os.environ.get("IEB_SHARED_EXERCISES") or os.path.join(ROOT, "shared-exercises")
+
 MANIFEST_NAMES = ("manifest.json", "manifest.yaml", "manifest.yml")
 ARCHIVE_EXTS = (".zip", ".tar.gz", ".tgz")
 PACK_EXT = ".iebpack.json"
@@ -666,16 +674,109 @@ MAX_ASSET_BYTES = 40 * 1024 * 1024      # 40 MB per file
 MAX_BODY_BYTES = 64 * 1024 * 1024       # 64 MB per request
 
 
-def unique_folder(base: str) -> str:
-    """textbooks/<base> with a numeric suffix if the name is taken."""
-    os.makedirs(TEXTBOOKS_DIR, exist_ok=True)
-    folder = os.path.join(TEXTBOOKS_DIR, base)
+def unique_folder(base: str, base_dir: Optional[str] = None) -> str:
+    """<base_dir>/<base> with a numeric suffix if the name is taken."""
+    root_dir = base_dir or TEXTBOOKS_DIR
+    os.makedirs(root_dir, exist_ok=True)
+    folder = os.path.join(root_dir, base)
     if not os.path.exists(folder):
         return folder
     n = 2
-    while os.path.exists(os.path.join(TEXTBOOKS_DIR, "%s-%d" % (base, n))):
+    while os.path.exists(os.path.join(root_dir, "%s-%d" % (base, n))):
         n += 1
-    return os.path.join(TEXTBOOKS_DIR, "%s-%d" % (base, n))
+    return os.path.join(root_dir, "%s-%d" % (base, n))
+
+
+def build_pack(manifest: dict, books: dict, assets: Optional[dict] = None) -> dict:
+    """Assemble a self-contained .iebpack.json (manifest + books + media)."""
+    import datetime
+    return {
+        "format": "ieb-pack",
+        "version": 1,
+        "exported": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "generator": "IntExeBook",
+        "manifest": manifest,
+        "books": books,
+        "assets": assets or {},
+    }
+
+
+def publish_course(payload: dict) -> dict:
+    """Save a finished teacher-made course into shared-exercises/<slug>/ and
+    write its one-file share pack <slug>.iebpack.json next to it.
+
+    The result tells the caller where everything landed so the teacher can
+    copy either the whole folder or just the single .iebpack.json file.
+    """
+    mf = validate_manifest(payload.get("manifest"))
+    if not mf["ok"]:
+        raise TextbookError("; ".join(mf["errors"]))
+    manifest = mf["value"]
+    books_raw = payload.get("books") or {}
+    books: dict = {}
+    all_errors: list[str] = []
+    for slot in ("student", "workbook"):
+        if slot not in books_raw or not books_raw[slot]:
+            continue
+        vb = validate_book(books_raw[slot])
+        all_errors.extend("%s: %s" % (slot, e) for e in vb["errors"])
+        books[slot] = vb["value"]
+    if all_errors:
+        raise TextbookError("; ".join(all_errors[:8]))
+    if not books:
+        raise TextbookError("nothing to publish — the course has no content")
+
+    slug = slugify(manifest["id"] or manifest["title"]) or "course"
+    folder = unique_folder(slug, SHARED_DIR)
+    name = os.path.basename(folder)
+    manifest["id"] = name
+    manifest["source"] = "shared"
+    assets = payload.get("assets") or {}
+
+    # full textbook layout inside shared-exercises/<name>/
+    write_textbook(folder, manifest, books, assets)
+    # a *copy* of every asset also travels inside the pack as data URLs,
+    # including files uploaded earlier straight into the course folder
+    pack_assets = dict(assets)
+    adir = os.path.join(folder, "assets")
+    if os.path.isdir(adir):
+        for dirpath, _dirs, files in os.walk(adir):
+            for fn in files:
+                rel = os.path.relpath(os.path.join(dirpath, fn), adir).replace(os.sep, "/")
+                if rel in pack_assets:
+                    continue
+                try:
+                    with open(os.path.join(dirpath, fn), "rb") as fh:
+                        raw = fh.read()
+                    mime = "application/octet-stream"
+                    low = fn.lower()
+                    for ext, m in ((".mp3", "audio/mpeg"), (".wav", "audio/wav"),
+                                   (".ogg", "audio/ogg"), (".m4a", "audio/mp4"),
+                                   (".png", "image/png"), (".jpg", "image/jpeg"),
+                                   (".jpeg", "image/jpeg"), (".gif", "image/gif"),
+                                   (".webp", "image/webp"), (".svg", "image/svg+xml"),
+                                   (".mp4", "video/mp4"), (".webm", "video/webm")):
+                        if low.endswith(ext):
+                            mime = m
+                            break
+                    import base64
+                    pack_assets["assets/" + rel] = "data:%s;base64," % mime + base64.b64encode(raw).decode()
+                except OSError:
+                    pass
+
+    pack_path = os.path.join(SHARED_DIR, name + PACK_EXT)
+    with open(pack_path, "w", encoding="utf-8") as fh:
+        json.dump(build_pack(manifest, books, pack_assets), fh, ensure_ascii=False)
+
+    invalidate_cache()
+    return {
+        "folder": name,
+        "id": name,
+        "title": manifest["title"],
+        "dir": folder,
+        "pack_file": pack_path,
+        "pack_name": os.path.basename(pack_path),
+    }
 
 
 def write_textbook(folder: str, manifest: dict, books: dict, assets: Optional[dict] = None) -> None:
@@ -882,6 +983,44 @@ def scan_textbooks() -> list[dict]:
             "description": manifest.get("description", ""),
             "cover": manifest.get("cover", ""),
             "publisher": manifest.get("publisher", ""),
+            "icon": manifest.get("icon", ""),
+            "author": manifest.get("author", ""),
+            "source": manifest.get("source", "") or ("shared" if base_dir == SHARED_DIR else ""),
+            "books": books,
+        })
+    # published teacher courses: shared-exercises/<course>/ has the very same
+    # layout, so scan it with identical logic and tag the cards source="shared"
+    for entry in sorted(os.listdir(SHARED_DIR)) if os.path.isdir(SHARED_DIR) else []:
+        if entry.startswith("."):
+            continue
+        try:
+            folder = _ensure_folder_for(SHARED_DIR, entry)
+            if not folder:
+                continue
+            mpath = _find_manifest(folder)
+            if not mpath:
+                continue
+            manifest = _read_manifest(mpath)
+        except Exception as exc:
+            cards.append({"folder": entry, "id": entry, "title": entry,
+                          "error": str(exc), "source": "shared"})
+            continue
+        books = []
+        for slot, label in (("student", "Student's Book"), ("workbook", "Workbook")):
+            if manifest.get(slot + "_file") or manifest.get(slot):
+                books.append({"slot": slot, "label": manifest.get(slot) or label})
+        folder_name = os.path.basename(folder)
+        cards.append({
+            "folder": folder_name,
+            "id": manifest.get("id") or folder_name,
+            "title": manifest.get("title") or folder_name,
+            "level": manifest.get("level", ""),
+            "description": manifest.get("description", ""),
+            "cover": manifest.get("cover", ""),
+            "publisher": manifest.get("publisher", ""),
+            "icon": manifest.get("icon", ""),
+            "author": manifest.get("author", ""),
+            "source": manifest.get("source", "") or "shared",
             "books": books,
         })
     # de-duplicate by card id (e.g. an archive and its unpacked folder coexist)
@@ -894,6 +1033,19 @@ def scan_textbooks() -> list[dict]:
         seen.add(key)
         unique.append(c)
     return unique
+
+
+def _ensure_folder_for(base_dir: str, entry: str) -> Optional[str]:
+    """_ensure_folder but rooted at an arbitrary directory (shared-exercises)."""
+    folder = os.path.join(base_dir, entry)
+    if os.path.isdir(folder) and _find_manifest(folder):
+        return folder
+    if os.path.isfile(folder) and entry.lower().endswith(ARCHIVE_EXTS):
+        target = os.path.join(base_dir, _folder_for_archive(entry))
+        if not os.path.isdir(target):
+            _unpack_into(folder, target)
+        return target if _find_manifest(target) else None
+    return None
 
 
 def get_textbook_meta(folder_or_id: str) -> tuple[str, dict]:
@@ -921,6 +1073,23 @@ def get_textbook_meta(folder_or_id: str) -> tuple[str, dict]:
         manifest = _read_manifest(mpath)
         if (manifest.get("id") or entry) == folder_or_id:
             return folder, manifest
+    # published teacher courses in shared-exercises/ resolve the same way
+    if os.path.isdir(SHARED_DIR):
+        cand = os.path.join(SHARED_DIR, folder_or_id)
+        if os.path.isdir(cand) and _find_manifest(cand):
+            return cand, _read_manifest(_find_manifest(cand))  # type: ignore
+        for entry in sorted(os.listdir(SHARED_DIR)):
+            if entry.startswith("."):
+                continue
+            folder = _ensure_folder_for(SHARED_DIR, entry)
+            if not folder:
+                continue
+            mpath = _find_manifest(folder)
+            if not mpath:
+                continue
+            manifest = _read_manifest(mpath)
+            if (manifest.get("id") or os.path.basename(folder)) == folder_or_id:
+                return folder, manifest
     raise TextbookError("Textbook not found: %s" % folder_or_id)
 
 
