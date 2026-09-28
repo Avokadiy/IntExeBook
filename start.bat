@@ -24,7 +24,7 @@ REM -- 0) portable Python we auto-installed earlier? --------------
 if exist "%BUNDLED_PY%" (
   echo Starting IntExeBook...
   echo Leave this window open while you use the app. Close it to stop.
-  start "" http://localhost:8000
+  start "" http://127.0.0.1:8000
   "%BUNDLED_PY%" server\app.py --port 8000
   echo.
   echo The server stopped unexpectedly. Press any key to close.
@@ -85,7 +85,7 @@ if defined PY (
   if not errorlevel 1 (
     echo Starting IntExeBook with Python...
     echo Leave this window open while you use the app. Close it to stop.
-    start "" http://localhost:8000
+    start "" http://127.0.0.1:8000
     "%PY%" server\app.py --port 8000
     echo.
     echo The server stopped unexpectedly. Press any key to close.
@@ -105,7 +105,7 @@ if errorlevel 1 (
 )
 echo Starting IntExeBook...
 echo Leave this window open while you use the app. Close it to stop.
-start "" http://localhost:8000
+start "" http://127.0.0.1:8000
 "%BUNDLED_PY%" server\app.py --port 8000
 echo.
 echo The server stopped unexpectedly. Press any key to close.

@@ -3,7 +3,7 @@
 IntExeBook – local web app for teachers.
 
 Run:  python server/app.py  [--port 8000]
-Then open http://localhost:8000
+Then open http://127.0.0.1:8000
 
 No third-party dependencies required (Python 3.8+ standard library only).
 """

@@ -52,7 +52,7 @@ function listen(p, attemptsLeft) {
     }
   });
   server.listen(p, "127.0.0.1", () => {
-    const url = "http://localhost:" + p;
+    const url = "http://127.0.0.1:" + p;
     console.log("============================================================");
     console.log("  IntExeBook is running:  " + url);
     console.log("  Textbooks folder:       " + core.TEXTBOOKS_DIR);
