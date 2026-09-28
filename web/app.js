@@ -900,7 +900,7 @@ window.IEB_APP = {
   app, crumbsEl, bookCache, taskCache, FILE_MODE, API,
   getJSON, loadLocalFile, esc, navigate, renderCrumbs, route,
   loadBookMeta, loadBook, loadBookRaw, loadTask, loadFileModeIndex,
-  findUnit, findLesson, mediaSrc, normalizeMediaSrc,
+  findUnit, findLesson, mediaSrc, normalizeMediaSrc, mediaHtml,
 };
 
 /* go! */
