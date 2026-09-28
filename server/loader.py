@@ -202,6 +202,101 @@ def _extract_zip(archive: str, target: str) -> None:
                 shutil.copyfileobj(src, out)
 
 
+# --------------------------------------------------------------------------- #
+# damaged-zip recovery
+# --------------------------------------------------------------------------- #
+# When the central directory at the tail of a .zip is truncated or corrupted,
+# zipfile raises BadZipFile and the whole textbook becomes unusable.  The data
+# blobs are usually still intact, so we walk the local file headers (PK\3\4)
+# ourselves – each one stores its own CRC and compressed size.
+
+_LOC_HDR_SIG = b"PK\x03\x04"
+_DATA_DESC_SIG = b"PK\x07\x08"
+
+
+def _iter_local_headers(buf: bytes):
+    pos = 0
+    n = len(buf)
+    while pos + 30 <= n:
+        i = buf.find(_LOC_HDR_SIG, pos)
+        if i < 0:
+            return
+        pos = i
+        flag_bits = int.from_bytes(buf[i + 6:i + 8], "little")
+        method = int.from_bytes(buf[i + 8:i + 10], "little")
+        crc = int.from_bytes(buf[i + 14:i + 18], "little")
+        comp = int.from_bytes(buf[i + 18:i + 22], "little")
+        uncomp = int.from_bytes(buf[i + 22:i + 26], "little")
+        name_len = int.from_bytes(buf[i + 26:i + 28], "little")
+        extra_len = int.from_bytes(buf[i + 28:i + 30], "little")
+        # healthy stored entries have comp == uncomp; if that invariant is
+        # broken the signature we found is just random data inside a blob.
+        if method == 0 and comp > 0 and crc != 0 and uncomp != comp:
+            return
+        raw = buf[i + 30:i + 30 + name_len]
+        try:
+            name = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            name = raw.decode("cp437")
+        name = name.replace("\\", "/")
+        start = i + 30 + name_len + extra_len
+        if name and ".." not in name.split("/") and start + comp <= n:
+            yield name, method, start, comp, uncomp
+        pos = start + comp
+        if flag_bits & 0x8:                       # streamed sizes follow data
+            if pos + 12 <= n:
+                if buf[pos:pos + 4] == _DATA_DESC_SIG:
+                    pos += 4
+                pos += 12
+
+
+def extract_asset_from_archive(archive: str, rel: str, folder: str) -> bool:
+    """Extract one member (``assets/<rel>``) from *archive* into *folder*.
+
+    Tries zipfile first; if the archive is too damaged for it, falls back to
+    reading local file headers directly.  Returns True when the file was
+    written.  Never raises for unreadable archives."""
+    rel = rel.replace("\\", "/").lstrip("/")
+    wanted = ("assets/" + rel, rel)
+    try:
+        with zipfile.ZipFile(archive) as zf:
+            for info in zf.infolist():
+                name = _fix_zip_name(info)
+                if name.rstrip("/") in wanted or \
+                        any(n.endswith("/" + wanted[0]) for n in (name,)):
+                    data = zf.read(info)
+                    dest = _safe_join(folder, *wanted[0].split("/"))
+                    os.makedirs(os.path.dirname(dest), exist_ok=True)
+                    with open(dest, "wb") as fh:
+                        fh.write(data)
+                    return True
+    except Exception:
+        pass
+    try:
+        with open(archive, "rb") as fh:
+            buf = fh.read()
+    except OSError:
+        return False
+    for name, method, start, comp, _uncomp in _iter_local_headers(buf):
+        if name.rstrip("/") not in wanted and not name.endswith("/" + wanted[0]):
+            continue
+        data = buf[start:start + comp]
+        if method == 8:
+            import zlib
+            try:
+                data = zlib.decompress(data, -15)
+            except zlib.error:
+                return False
+        elif method != 0:
+            return False
+        dest = _safe_join(folder, *wanted[0].split("/"))
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, "wb") as fh:
+            fh.write(data)
+        return True
+    return False
+
+
 def _extract_tar(archive: str, target: str) -> None:
     with tarfile.open(archive, "r:*") as tf:
         members = [m for m in tf.getmembers()

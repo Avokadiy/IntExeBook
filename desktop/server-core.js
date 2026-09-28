@@ -123,29 +123,78 @@ function decodeZipName(rawBytes, flagBits) {
   return viaCp437;
 }
 
-function parseZip(buf) {
-  // locate End Of Central Directory record
+const LOC_SIG = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+
+/* Read every entry straight from its local file header (PK\3\4).  This works
+   even when the central directory at the end of the archive is damaged or
+   missing (a truncated download, an editor that saved over the tail): we can
+   still walk the data blobs because each local header stores its own CRC and
+   compressed size. */
+function parseZipLocals(buf) {
+  const entries = [];
+  let pos = 0;
+  while (pos + 30 <= buf.length) {
+    const i = buf.indexOf(LOC_SIG, pos);
+    if (i < 0) break;
+    pos = i;
+    const flagBits = buf.readUInt16LE(i + 6);
+    const method = buf.readUInt16LE(i + 8);
+    const crc = buf.readUInt32LE(i + 14);
+    const compSize = buf.readUInt32LE(i + 18);
+    const uncompSize = buf.readUInt32LE(i + 22);
+    const nameLen = buf.readUInt16LE(i + 26);
+    const extraLen = buf.readUInt16LE(i + 28);
+    // a healthy stored (uncompressed) entry has comp == uncomp and a real CRC;
+    // if that invariant is broken the "signature" we found is random data.
+    if (method === 0 && compSize > 0 && crc !== 0 && uncompSize !== compSize) break;
+    const rawName = buf.slice(i + 30, i + 30 + nameLen);
+    const name = decodeZipName(rawName, flagBits).replace(/\\/g, "/");
+    const start = i + 30 + nameLen + extraLen;
+    if (!name || name.includes("..") || start + compSize > buf.length) { pos = i + 4; continue; }
+    entries.push({ name, method, headerOffset: i, compSize, uncompSize });
+    pos = start + compSize;
+    if (flagBits & 0x8) {                     // streamed sizes -> data descriptor
+      if (pos + 12 <= buf.length) {
+        if (buf.readUInt32LE(pos) === 0x08074b50) pos += 4;
+        pos += 12;
+      }
+    }
+  }
+  return entries;
+}
+
+function zipEntriesFromCentral(buf) {
   let eocd = -1;
   for (let i = buf.length - 22; i >= 0 && i >= buf.length - 65557; i--) {
     if (buf.readUInt32LE(i) === 0x06054b50) { eocd = i; break; }
   }
-  if (eocd < 0) throw new TextbookError("Not a valid .zip archive (missing central directory).");
+  if (eocd < 0) return null;
+  const cdOff = buf.readUInt32LE(eocd + 16);
+  const cdSize = buf.readUInt32LE(eocd + 12);
+  // sanity check: the central directory must sit right before the EOCD; if it
+  // doesn't, the tail of the archive was truncated and the CD is unusable.
+  if (cdOff + cdSize !== eocd) return null;
   const count = buf.readUInt16LE(eocd + 10);
-  let off = buf.readUInt32LE(eocd + 16);
+  let off = cdOff;
   const entries = [];
   for (let n = 0; n < count; n++) {
-    if (off + 46 > buf.length || buf.readUInt32LE(off) !== 0x02014b50) break;
+    if (off + 46 > buf.length || buf.readUInt32LE(off) !== 0x02014b50) return null;
     const method = buf.readUInt16LE(off + 10);
     const flagBits = buf.readUInt16LE(off + 8);
     const compSize = buf.readUInt32LE(off + 20);
+    const uncompSize = buf.readUInt32LE(off + 24);
     const nameLen = buf.readUInt16LE(off + 28);
     const extraLen = buf.readUInt16LE(off + 30);
     const commentLen = buf.readUInt16LE(off + 32);
     const rawName = buf.slice(off + 46, off + 46 + nameLen);
     const name = decodeZipName(rawName, flagBits).replace(/\\/g, "/");
-    entries.push({ name, method, headerOffset: buf.readUInt32LE(off + 42), compSize });
+    entries.push({ name, method, headerOffset: buf.readUInt32LE(off + 42), compSize, uncompSize });
     off += 46 + nameLen + extraLen + commentLen;
   }
+  return entries;
+}
+
+function makeZipReader(buf, entries) {
   return {
     names() { return entries.map(e => e.name); },
     entry(name) { return entries.find(e => e.name === name); },
@@ -155,12 +204,25 @@ function parseZip(buf) {
       const nameLen = buf.readUInt16LE(ho + 26);
       const extraLen = buf.readUInt16LE(ho + 28);
       const start = ho + 30 + nameLen + extraLen;
-      const data = buf.slice(start, start + e.compSize);
+      let size = e.compSize;
+      if (!size && e.uncompSize != null && e.method === 0) size = e.uncompSize;
+      const data = buf.slice(start, start + size);
       if (e.method === 0) return data;
       if (e.method === 8) return zlib.inflateRawSync(data);
       throw new TextbookError("Unsupported zip compression method " + e.method);
     },
   };
+}
+
+/* Robust .zip reader: prefer the authoritative central directory, but fall
+   back to walking local file headers when it is missing or damaged — that is
+   exactly what happens with archives whose tail got truncated. */
+function parseZip(buf) {
+  const central = zipEntriesFromCentral(buf);
+  if (central && central.length) return makeZipReader(buf, central);
+  const locals = parseZipLocals(buf);
+  if (locals.length) return makeZipReader(buf, locals);
+  throw new TextbookError("Not a valid .zip archive (no readable entries).");
 }
 
 /* ------------------------------------------------------------ tar reader */
@@ -506,6 +568,43 @@ function sendFile(res, file, req) {
   res.end(body);
 }
 
+/* Serve a file relative to a textbook folder, accepting either a plain
+   relative path ("assets/farm.mp3") or an absolute one (legacy manifests).
+   Falls back to the archive inside textbooks/ when the folder was never
+   unpacked.  Always answers with Accept-Ranges + real Range support, because
+   browsers refuse to play <audio>/<video> from servers that cannot seek. */
+function sendTextbookAsset(res, baseDir, relPath, req) {
+  let rel = String(relPath || "").replace(/\\/g, "/").replace(/^\/+/, "");
+  const m = rel.match(/^(?:[^/]+\/)?assets\/(.+)$/); // "bookid/assets/x" -> "x"
+  if (!m) return sendJson(res, { error: "Bad asset path" }, 400);
+  rel = "assets/" + m[1];
+  let file;
+  try { file = safeJoin(baseDir, rel); }
+  catch (e) { return sendJson(res, { error: "Unsafe path" }, 400); }
+  if (!(fs.existsSync(file) && fs.statSync(file).isFile())) {
+    // assets stored inside an unpackable archive – extract just this member
+    const stem = path.join(baseDir, path.basename(baseDir));
+    const cands = [stem + ".zip", stem + ".tar.gz", stem + ".tgz", stem + ".tar"];
+    for (const arc of cands) {
+      if (!fs.existsSync(arc)) continue;
+      try {
+        const zf = openArchive(arc);
+        let e = zf.entry(rel);
+        if (!e) {
+          const hit = zf.names().find(n => n === rel || n.endsWith("/" + rel));
+          if (hit) e = zf.entry(hit);
+        }
+        if (!e) continue;
+        const data = zf.read(e);
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        fs.writeFileSync(file, data);
+      } catch (err) { continue; }
+      break;
+    }
+  }
+  return sendFile(res, file, req);
+}
+
 function handle(req, res) {
   try {
     const url = new URL(req.url, "http://localhost");
@@ -542,8 +641,14 @@ function handle(req, res) {
       return sendJson(res, loadTaskFull(tbId, slot, unitId, lessonId, taskId));
     }
     if (parts[0] === "assets" && parts.length >= 3) {
-      const { folder } = getTextbookMeta(parts[1]);
-      return sendFile(res, safeJoin(folder, "assets", ...parts.slice(2)), req);
+      // resolve by folder name first (cheap), otherwise scan the catalogue —
+      // URLs carry textbook *ids*, which may differ from the folder name.
+      let baseDir = path.join(TEXTBOOKS_DIR, parts[1]);
+      if (!fs.existsSync(baseDir)) {
+        try { baseDir = resolveTextbook(parts[1]).folder; }
+        catch (e) { /* keep the raw path: sendFile answers 404 below */ }
+      }
+      return sendTextbookAsset(res, baseDir, parts.slice(2).join("/"), req);
     }
     return sendJson(res, { error: "Unknown endpoint" }, 404);
   } catch (exc) {

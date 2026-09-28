@@ -81,6 +81,29 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _send_asset(self, tb_id: str, rel_parts) -> None:
+        """Serve <textbook>/assets/<file>, transparently extracting the file
+        from a sibling archive when the folder was never unpacked (a broken
+        or not-yet-scanned .zip must not disable audio/video playback)."""
+        try:
+            folder, _manifest = loader.get_textbook_meta(tb_id)
+        except loader.TextbookError:
+            folder = os.path.join(loader.TEXTBOOKS_DIR, tb_id)
+        rel = "/".join(rel_parts)
+        full = loader.asset_path(folder, rel)
+        if not os.path.isfile(full):
+            stem = os.path.join(loader.TEXTBOOKS_DIR, tb_id)
+            for ext in (".zip", ".tar.gz", ".tgz", ".tar"):
+                arc = stem + ext
+                if not os.path.exists(arc):
+                    continue
+                try:
+                    if loader.extract_asset_from_archive(arc, rel, folder):
+                        break
+                except Exception:
+                    continue
+        return self._send_file(full)
+
     # --------------------------------------------------------------- routing
     def do_GET(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
@@ -146,9 +169,7 @@ class Handler(BaseHTTPRequestHandler):
 
             # GET /assets/<textbook-id>/<file...>      -> textbook assets
             if parts and parts[0] == "assets" and len(parts) >= 3:
-                folder, _manifest = loader.get_textbook_meta(parts[1])
-                full = loader.asset_path(folder, *parts[2:])
-                return self._send_file(full)
+                return self._send_asset(parts[1], parts[2:])
 
             return self._send_json({"error": "Unknown endpoint"}, 404)
         except loader.TextbookError as exc:
