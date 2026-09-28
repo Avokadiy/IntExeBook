@@ -191,7 +191,9 @@
     });
 
     const list = document.getElementById("draftList");
-    const drafts = await listAllDrafts();
+    let drafts = [];
+    try { drafts = await listAllDrafts(); } catch (e) { console.warn("drafts:", e); }
+    if (!list) return;
     if (!drafts.length) { list.innerHTML = `<div class="meta" style="color:var(--muted)">No drafts yet — they are saved automatically while you edit.</div>`; return; }
     list.innerHTML = "";
     drafts.forEach(d => {
@@ -242,25 +244,21 @@
   }
 
   function pickTextbook() {
-    loadBookMeta("").catch(() => null).then(() => {
-      const get = FILE_MODE ? A.loadFileModeIndex() : getJSON("/api/textbooks");
-      get.then(data => {
-        const list = (data.textbooks || []).filter(t => !t.error);
-        const wrap = h("div", { class: "ed-modal" }, [
-          h("div", { class: "ed-modal-box" }, [
-            h("h3", null, "Add exercises to which textbook?"),
-            h("div", { class: "ed-modal-list" }, list.map(tb =>
-              h("button", { class: "sr-item", type: "button", onclick: () => { wrap.remove(); location.hash = "#/edit/book/" + encodeURIComponent(tb.folder || tb.id) + "/student"; } }, [
-                h("span", { class: "sr-icon" }, tb.icon || "📕"),
-                h("span", null, [h("span", { class: "sr-title" }, tb.title),
-                                  h("span", { class: "sr-sub" }, (tb.level || "") + " · " + (tb.books || []).map(b => b.slot).join(", "))]),
-              ]))),
-            btn("Cancel", "btn-ghost", () => wrap.remove()),
-          ]),
-        ]);
-        document.body.appendChild(wrap);
-      }).catch(e => toast(String(e.message || e), "bad"));
-    });
+    loadAllTextbooks().then(list => {
+      const wrap = h("div", { class: "ed-modal" }, [
+        h("div", { class: "ed-modal-box" }, [
+          h("h3", null, "Add exercises to which textbook?"),
+          list.length ? h("div", { class: "ed-modal-list" }, list.map(tb =>
+            h("button", { class: "sr-item", type: "button", onclick: () => { closeModal(); location.hash = "#/edit/book/" + encodeURIComponent(tb.folder || tb.id) + "/student"; } }, [
+              h("span", { class: "sr-icon" }, tb.icon || "📕"),
+              h("span", null, [h("span", { class: "sr-title" }, tb.title),
+                                h("span", { class: "sr-sub" }, (tb.level || "") + " · " + (tb.books || []).map(b => b.slot).join(", "))]),
+            ]))) : h("p", { class: "ed-help" }, "No textbooks found."),
+          btn("Cancel", "btn-ghost", closeModal),
+        ]),
+      ]);
+      openModal(wrap);
+    }).catch(e => toast(String(e.message || e), "bad"));
   }
   /* ============================================================ #/import */
   function renderImport() {
@@ -582,23 +580,27 @@
     }
     // editing an existing textbook: load the full raw book into a session
     const { tbId, slot, unitId, lessonId, taskId } = params;
-    const tb = await loadBookMeta(tbId);
-    const useSlot = slot || "student";
-    const book = await loadBookRaw(tbId, useSlot);
-    delete book.book_label; delete book.textbook_title;
-    const manifest = Object.assign({}, tb, { id: tb.folder || tb.id });
-    ["books", "folder", "error"].forEach(k => delete manifest[k]);
-    session = {
-      draftName: "edit-" + S.slugify(tbId) + "-" + useSlot,
-      target: { mode: "inplace", tbId: tb.folder || tb.id, tbTitle: tb.title, slot: useSlot },
-      manifest: manifest,
-      slot: useSlot,
-      book: book,
-      assets: {},
-      dirty: false,
-      inplace: true,
-    };
-    renderEditorOutline({ focusUnit: unitId, focusLesson: lessonId, focusTask: taskId });
+    try {
+      const tb = await loadBookMeta(tbId);
+      const useSlot = slot || "student";
+      const book = await loadBookRaw(tbId, useSlot);
+      delete book.book_label; delete book.textbook_title;
+      const manifest = Object.assign({}, tb, { id: tb.folder || tb.id });
+      ["books", "folder", "error"].forEach(k => delete manifest[k]);
+      session = {
+        draftName: "edit-" + S.slugify(tbId) + "-" + useSlot,
+        target: { mode: "inplace", tbId: tb.folder || tb.id, tbTitle: tb.title, slot: useSlot },
+        manifest: manifest,
+        slot: useSlot,
+        book: book,
+        assets: {},
+        dirty: false,
+        inplace: true,
+      };
+      renderEditorOutline({ focusUnit: unitId, focusLesson: lessonId, focusTask: taskId });
+    } catch (e) {
+      app.innerHTML = `<div class="error-box">Could not open this textbook for editing: ${esc(e.message || e)} <a href="#/create" style="color:inherit;text-decoration:underline">← back to Create</a></div>`;
+    }
   }
 
   /* ============================================================ OUTLINE VIEW */
@@ -663,7 +665,7 @@
   function chip(text, cls) { return h("span", { class: "ed-chip" + (cls ? " " + cls : "") }, text); }
 
   function unitCard(u, ui, focus) {
-    const card = h("div", { class: "ed-card" + (focus && focus.focusUnit === u.id ? " focus" : "") });
+    const card = h("div", { class: "ed-card" + (focus && focus.focusUnit === u.id ? " ed-focus" : "") });
     const head = h("div", { class: "ed-card-head" }, [
       input(u.title, (v) => { u.title = v; markDirty(); }, { placeholder: "Unit / topic title" }),
       rowBtn("↑", () => moveItem(session.book.units, ui, -1), "tiny"),
@@ -683,12 +685,12 @@
   }
 
   function lessonRow(u, ui, l, li, focus) {
-    const row = h("div", { class: "ed-lesson" + (focus && focus.focusLesson === l.id ? " focus" : "") });
-    row.appendChild(input(l.title, (v) => { l.title = v; markDirty(); }, { placeholder: "Lesson / topic title", class: "ed-input ed-lesson-title" }));
-    row.appendChild(input(l.page == null ? "" : l.page, (v) => { l.page = v ? parseInt(v, 10) || null : null; markDirty(); }, { placeholder: "page", type: "number", class: "ed-input ed-page" }));
+    const row = h("div", { class: "ed-lesson" + (focus && focus.focusLesson === l.id ? " ed-focus" : "") });
+    row.appendChild(input(l.title, (v) => { l.title = v; markDirty(); }, { placeholder: "Lesson / topic title", class: "ed-input ed-lesson-title-in" }));
+    row.appendChild(input(l.page == null ? "" : l.page, (v) => { l.page = v ? parseInt(v, 10) || null : null; markDirty(); }, { placeholder: "page", type: "number", class: "ed-input ed-page-num" }));
     const pills = h("div", { class: "ed-tasks" });
     (l.tasks || []).forEach((t, ti) => {
-      const pill = h("span", { class: "ed-task-pill" + (focus && focus.focusTask === t.id ? " focus" : "") }, [
+      const pill = h("span", { class: "ed-task-pill" + (focus && focus.focusTask === t.id ? " active" : "") }, [
         h("span", null, (S.TASK_TYPES.find(x => x.type === t.type) || {}).icon || "⭐"),
         h("span", { class: "ed-task-name" }, t.title || "Untitled"),
         h("button", { class: "ed-mini", type: "button", onclick: () => openTaskEditor(u, ui, l, li, t, ti) }, "✎"),
@@ -880,7 +882,7 @@
     function renderTabs(active) {
       tabs.innerHTML = "";
       [["content", "✍ Content"], ["preview", "👁 Preview"], ["media", "🖼 Media"]].forEach(([id, label]) => {
-        tabs.appendChild(h("button", { class: "ed-tab" + (id === active ? " on" : ""), type: "button", onclick: () => renderTabs(id) }, label));
+        tabs.appendChild(h("button", { class: "ed-tab" + (id === active ? " active" : ""), type: "button", onclick: () => renderTabs(id) }, label));
       });
       if (active === "preview") pane.innerHTML = "", pane.appendChild(previewBlock(t));
       else if (active === "media") pane.innerHTML = "", pane.appendChild(mediaEditor(t));
@@ -930,7 +932,7 @@
 
   /* ---- per-type forms ---- */
   function typeFields(t, onSwitch) {
-    const wrap = h("div", { class: "ed-type" });
+    const wrap = h("div", { class: "ed-typeform" });
     if (t.type === "multiple-choice") {
       t.options = t.options || ["", ""];
       const list = h("div", { class: "ed-optlist" });
@@ -1012,11 +1014,20 @@
   /* ---- live preview using the real player engines ---- */
   function previewBlock(t) {
     const holder = h("div", { class: "ed-preview" });
+    // show attached media first, so teachers see images/audio right in preview
+    if (A.mediaHtml && session) {
+      const tmp = document.createElement("div");
+      tmp.innerHTML = A.mediaHtml(t, (session.savedTo || (session.target && session.target.tbId) || "") );
+      const mediaEl = tmp.firstElementChild;
+      if (mediaEl) holder.appendChild(mediaEl);
+    }
     holder.appendChild(h("div", { class: "player" }, [
       h("div", { class: "badge" }, t.type),
       h("h2", { style: "margin:6px 0" }, t.title || "Untitled task"),
       h("p", { class: "instr" }, t.instruction || ""),
       (() => { const m = h("div", { id: "edPrevBody" }); return m; })(),
+      (() => { const f = h("div", { class: "feedback" }); f.id = "edPrevFeedback"; return f; })(),
+      (() => { const r = h("div", { class: "check-row" }); const b = h("button", { class: "btn btn-ghost", type: "button" }, "↺ Try again"); b.id = "edPrevRetry"; b.style.display = "none"; r.appendChild(b); return r; })(),
     ]));
     setTimeout(() => {
       const body = holder.querySelector("#edPrevBody");
@@ -1032,7 +1043,16 @@
 
   /* Minimal context so the production player engines can run inside preview. */
   function renderEngineCtx(body, task) {
-    return { body, task, feedback: h("div"), btnNext: h("button"), btnRetry: h("button"), dots: h("div"), state: { results: [] }, idx: 0, drawDots: () => {}, goHash: () => {}, tbId: session ? (session.savedTo || "") : "" };
+    const feedback = body.parentElement ? body.parentElement.querySelector("#edPrevFeedback") : null;
+    const btnRetry = document.getElementById("edPrevRetry");
+    return {
+      body, task,
+      feedback: feedback || h("div"),
+      btnNext: null,
+      btnRetry: btnRetry,
+      state: { results: [] }, idx: 0, drawDots: () => {}, goHash: () => {},
+      tbId: session ? (session.savedTo || session.target && session.target.tbId || "") : "",
+    };
   }
 
   /* ---- media manager ---- */
