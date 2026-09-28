@@ -71,6 +71,14 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send_json({"error": "Bad request"}, 400)
                 return self._send_file(os.path.join(WEB_DIR, rel))
 
+            # also serve web/ files by plain relative name so index.html can
+            # use the same <link href="style.css"> as in file:// mode
+            if "/" not in path.strip("/"):
+                direct = os.path.normpath(path.strip("/"))
+                if direct and not direct.startswith("..") and \
+                        os.path.isfile(os.path.join(WEB_DIR, direct)):
+                    return self._send_file(os.path.join(WEB_DIR, direct))
+
             parts = [p for p in path.split("/") if p]
 
             # GET /api/ping                            -> health check
