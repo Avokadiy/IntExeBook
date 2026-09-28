@@ -101,6 +101,28 @@ async function route() {
 window.addEventListener("hashchange", route);
 document.getElementById("brandHome").onclick = (ev) => { ev.preventDefault(); navigate("#/"); };
 
+/* ------------------------------------------------------------ dark theme */
+const THEME_KEY = "ieb-theme";
+const themeBtn = document.getElementById("themeToggle");
+function currentTheme() {
+  return document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+}
+function paintThemeButton() {
+  if (!themeBtn) return;
+  const dark = currentTheme() === "dark";
+  themeBtn.textContent = dark ? "☀️" : "🌙";
+  themeBtn.title = dark ? "Switch to light theme" : "Switch to dark theme";
+}
+if (themeBtn) {
+  themeBtn.addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
+    paintThemeButton();
+  });
+  paintThemeButton();
+}
+
 /* ------------------------------------------------------------ helpers */
 async function loadBookMeta(tbId) {
   const all = FILE_MODE ? await loadFileModeIndex() : await getJSON("/api/textbooks");
