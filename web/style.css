@@ -375,3 +375,202 @@ body {
   transition: background .15s, transform .15s;
 }
 .theme-toggle:hover { background: var(--chip-bg-hover); transform: rotate(-15deg) scale(1.05); }
+
+/* ---------- "Create exercises" button in the top bar ---------- */
+.btn-teacher {
+  flex: none; text-decoration: none; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 16px; border-radius: 12px; font-size: 14px; font-weight: 700;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff;
+  transition: filter .12s, transform .12s;
+}
+.btn-teacher:hover { filter: brightness(1.1); transform: translateY(-1px); }
+[data-theme="dark"] .btn-teacher { color: #0f1420; }
+
+/* ============================================================
+   AUTHORING UI (web/authoring.js) — all ed-* classes
+   ============================================================ */
+.ed-page { display: flex; flex-direction: column; gap: 4px; }
+
+/* top action bar of the editor */
+.ed-bar {
+  position: sticky; top: 68px; z-index: 40;
+  display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--card); border: 1px solid var(--border-soft); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 12px 18px; margin-bottom: 18px;
+}
+.ed-bar-left { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 16px; }
+.ed-bar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ed-bar-right .btn { padding: 9px 16px; font-size: 14px; }
+.ed-state { font-size: 13px; color: var(--muted); min-width: 110px; text-align: right; }
+.ed-target-chip {
+  font-size: 12.5px; font-weight: 600; color: var(--accent);
+  background: var(--pill-bg); border: 1px solid var(--card-hover-border);
+  padding: 4px 12px; border-radius: 999px;
+}
+.ed-crumbline { font-size: 13px; color: var(--muted); margin: 2px 0 10px; }
+
+/* two-column layout: units on the left, task editor on the right */
+.ed-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .ed-layout { grid-template-columns: 1fr; } }
+.ed-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.ed-pane {
+  background: var(--card); border: 1px solid var(--border-soft); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 18px 20px;
+}
+
+.ed-stats { display: flex; gap: 8px; flex-wrap: wrap; }
+.ed-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* unit / lesson cards */
+.ed-card {
+  background: var(--card); border: 1px solid var(--border-soft); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+}
+.ed-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ed-card-head .ed-input { flex: 1 1 180px; font-weight: 700; font-size: 16px; }
+.ed-card-foot { display: flex; gap: 8px; flex-wrap: wrap; padding-top: 4px; border-top: 1px dashed var(--border-soft); }
+.ed-lesson {
+  border: 1px solid var(--border-soft); border-radius: 12px;
+  background: var(--surface-3); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px;
+}
+.ed-lesson-title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ed-lesson-title .ed-input { flex: 1 1 160px; font-weight: 600; }
+.ed-tasks { display: flex; flex-direction: column; gap: 8px; }
+.ed-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.ed-inline { display: inline-flex; align-items: center; gap: 8px; }
+
+/* chips & badges inside the editor */
+.ed-chip {
+  display: inline-block; font-size: 12px; font-weight: 700; color: var(--muted);
+  background: var(--chip-bg); border-radius: 999px; padding: 4px 12px; white-space: nowrap;
+}
+.ed-chip.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.ed-chip.bad { background: var(--bad-bg); color: var(--bad-ink); }
+.ed-type {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--accent); background: var(--pill-bg); padding: 3px 9px; border-radius: 8px; white-space: nowrap;
+}
+.ed-task-name { font-weight: 700; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* task pills in the outline list */
+.ed-task-pill {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  border: 1px solid var(--border-soft); background: var(--surface); cursor: pointer;
+  border-radius: 10px; padding: 8px 10px; font: inherit; color: var(--ink);
+  transition: border-color .12s, background .12s;
+}
+.ed-task-pill:hover { border-color: var(--accent); background: var(--hover-bg); }
+.ed-task-pill.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+/* tabs */
+.ed-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+.ed-tab {
+  border: 1px solid var(--border-soft); background: var(--chip-bg); color: var(--ink);
+  padding: 7px 14px; border-radius: 999px; cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 600;
+}
+.ed-tab:hover { background: var(--chip-bg-hover); }
+.ed-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+[data-theme="dark"] .ed-tab.active { color: #0f1420; }
+
+/* form controls */
+.ed-field { display: block; margin-bottom: 12px; }
+.ed-label { display: block; font-size: 13px; font-weight: 700; color: var(--muted); margin-bottom: 5px; }
+.ed-input {
+  width: 100%; padding: 9px 12px; border: 1.5px solid var(--border-input); border-radius: 10px;
+  background: var(--surface); color: var(--ink); font: inherit; font-size: 14.5px; outline: none;
+  transition: border-color .12s, box-shadow .12s;
+}
+.ed-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+textarea.ed-input, .ed-textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
+select.ed-input { appearance: auto; }
+.ed-help { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 6px 0; }
+.ed-check { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; }
+.ed-radio { accent-color: var(--accent); }
+.ed-color { width: 46px; height: 34px; padding: 2px; flex: none; cursor: pointer; }
+.ed-icon-in { width: 72px; flex: none; text-align: center; font-size: 20px; }
+.ed-gaprow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ed-wordlist { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.ed-optlist { display: flex; flex-direction: column; gap: 8px; }
+.ed-optrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ed-optrow .ed-input { flex: 1 1 140px; }
+.ed-mini {
+  border: 1px solid var(--border-soft); background: var(--chip-bg); color: var(--ink);
+  border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: background .12s, border-color .12s; white-space: nowrap;
+}
+.ed-mini:hover { background: var(--chip-bg-hover); border-color: var(--accent); }
+.ed-mini.danger { color: var(--bad); border-color: var(--error-border); background: var(--error-bg); }
+.ed-mini.danger:hover { background: var(--bad-bg); }
+
+/* media upload */
+.ed-mediapane { display: flex; flex-direction: column; gap: 10px; }
+.ed-mediarow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ed-mediarow .ed-input { flex: 1 1 160px; }
+.ed-mediapath { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+.ed-file { font-size: 13px; color: var(--muted); }
+.ed-file::file-selector-button {
+  border: 1px solid var(--border-soft); background: var(--chip-bg); color: var(--ink);
+  border-radius: 8px; padding: 5px 10px; margin-right: 8px; cursor: pointer; font: inherit;
+}
+
+/* live student preview */
+.ed-preview { margin-top: 14px; }
+.ed-preview h4 { margin: 0 0 8px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.ed-preview .player { margin: 0; }
+
+/* validation problems panel */
+.ed-problems {
+  margin-top: 16px; background: var(--error-bg); border: 1px solid var(--error-border);
+  border-radius: var(--radius); padding: 14px 18px;
+}
+.ed-problems h4 { margin: 0 0 8px; color: var(--error-ink); }
+.ed-prob-line { font-size: 13.5px; line-height: 1.5; padding: 2px 0; }
+.ed-prob-line.bad { color: var(--error-ink); }
+.ed-prob-line.warn { color: var(--warn); }
+
+/* modal dialogs (textbook picker, export/share, settings) */
+.ed-modal {
+  position: fixed; inset: 0; z-index: 100; display: grid; place-items: center;
+  background: rgba(15, 20, 32, .55); backdrop-filter: blur(3px); padding: 20px;
+}
+.ed-modal-box {
+  background: var(--card); border: 1px solid var(--border-soft); border-radius: var(--radius);
+  box-shadow: var(--shadow-hover); width: min(560px, 94vw); max-height: 86vh; overflow-y: auto;
+  padding: 22px 24px; display: flex; flex-direction: column; gap: 12px;
+}
+.ed-modal-box-wide, .ed-modal.ed-modal-wide .ed-modal-box { width: min(760px, 94vw); }
+.ed-modal-box h3 { margin: 0 0 4px; font-size: 20px; }
+.ed-modal-body { display: flex; flex-direction: column; gap: 10px; }
+.ed-modal-foot { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; padding-top: 6px; }
+.ed-modal-list { display: flex; flex-direction: column; gap: 4px; max-height: 52vh; overflow-y: auto; }
+
+/* drop zone on #/import */
+.ed-drop {
+  margin-top: 18px; border: 2px dashed var(--border-input); border-radius: var(--radius);
+  background: var(--surface-3); color: var(--muted); text-align: center;
+  padding: 42px 20px; cursor: pointer; font-size: 15px; line-height: 1.6;
+  transition: border-color .15s, background .15s;
+}
+.ed-drop:hover, .ed-drop.over { border-color: var(--accent); background: var(--hover-bg); color: var(--ink); }
+
+/* toast notifications */
+.ed-toast {
+  position: fixed; left: 50%; bottom: 26px; transform: translate(-50%, 20px);
+  background: var(--ink); color: var(--bg); padding: 12px 22px; border-radius: 12px;
+  font-size: 14.5px; font-weight: 600; box-shadow: var(--shadow-hover);
+  opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; z-index: 200;
+  max-width: min(520px, 90vw); text-align: center;
+}
+.ed-toast.show { opacity: 1; transform: translate(-50%, 0); }
+.ed-toast.ok { background: var(--ok); color: #fff; }
+.ed-toast.bad { background: var(--bad); color: #fff; }
+.ed-toast.warn { background: var(--warn); color: #1e2530; }
+
+/* dark-theme tweaks for authoring-only surfaces */
+[data-theme="dark"] .ed-target-chip { color: var(--accent); }
+[data-theme="dark"] .ed-toast.ok, [data-theme="dark"] .ed-toast.bad { color: #0f1420; }
+
+/* media pane inside the task editor + target picker on #/create */
+.ed-media-pane { display: flex; flex-direction: column; gap: 10px; }
+.ed-target-picker { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 8px; }
