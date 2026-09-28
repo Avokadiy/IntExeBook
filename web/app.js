@@ -393,6 +393,37 @@ var TYPE_ICONS = {
   "multiple-choice": "🔤", "true-false": "☑️", "gap-fill": "✏️",
   "word-order": "🧩", "matching": "🔗",
 };
+
+/* ---------- media attachments (images / audio / video) ----------
+   A task may carry "media": [ { "type": "image|audio|video", "src":
+   "assets/farm.mp3", "caption": "optional" } ].  Relative sources are
+   served by the local backend at /assets/<book>/...; in file:// mode they
+   resolve against the textbook folder next to web/. */
+const MEDIA_TAGS = { image: "🖼️", audio: "🎧", video: "🎬" };
+function mediaSrc(tbId, src) {
+  if (/^(https?:|data:|\/)/.test(src)) return src;
+  const rel = "../textbooks/" + encodeURIComponent(tbId) + "/" + src;
+  return FILE_MODE ? rel : "/assets/" + encodeURIComponent(tbId) + "/" + src;
+}
+function hasMedia(task) {
+  return Array.isArray(task.media) && task.media.length > 0;
+}
+function firstMedia(task) {
+  return hasMedia(task) ? (task.media[0] || null) : null;
+}
+function mediaHtml(task, tbId) {
+  if (!hasMedia(task)) return "";
+  const items = task.media.map(m => {
+    const src = mediaSrc(tbId, m.src || "");
+    const cap = m.caption ? `<figcaption>${esc(m.caption)}</figcaption>` : "";
+    if (m.type === "audio")
+      return `<figure class="media-item"><audio controls preload="metadata" src="${esc(src)}"></audio>${cap}</figure>`;
+    if (m.type === "video")
+      return `<figure class="media-item"><video controls preload="metadata" src="${esc(src)}"></video>${cap}</figure>`;
+    return `<figure class="media-item"><img loading="lazy" src="${esc(src)}" alt="${esc(m.caption || "")}">${cap}</figure>`;
+  }).join("");
+  return `<div class="task-media">${items}</div>`;
+}
 async function viewTasks(tbId, slot, unitId, lessonId) {
   const [tb, book] = await Promise.all([loadBookMeta(tbId), loadBook(tbId, slot)]);
   const unit = findUnit(book, unitId);
@@ -418,6 +449,7 @@ async function viewTasks(tbId, slot, unitId, lessonId) {
     card.innerHTML = `
       <div style="font-size:34px;margin-bottom:8px">${TYPE_ICONS[t.type] || "⭐"}</div>
       <span class="badge">${esc(t.type || "task")}</span>
+      ${firstMedia(t) ? `<span class="badge media-badge">${MEDIA_TAGS[firstMedia(t).type] || "🎬"} media</span>` : ""}
       <h3>${i + 1}. ${esc(t.title || "Untitled task")}</h3>`;
     card.onclick = () => navigate(`#/tb/${encodeURIComponent(tbId)}/${slot}/${encodeURIComponent(unitId)}/${encodeURIComponent(lessonId)}/play/${encodeURIComponent(t.id)}`);
     grid.appendChild(card);
@@ -458,6 +490,7 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
         <div class="progress-dots" id="dots"></div>
       </div>
       <p class="instr">${esc(task.instruction || "")}</p>
+      ${mediaHtml(task, tbId)}
       <div id="body"></div>
       <div class="feedback" id="feedback"></div>
       <div class="check-row">
@@ -760,4 +793,5 @@ function viewNotFound() {
 }
 
 /* go! */
+initSearch();
 route();

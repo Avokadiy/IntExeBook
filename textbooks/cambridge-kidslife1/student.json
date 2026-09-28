@@ -14,7 +14,12 @@
               "type": "multiple-choice",
               "title": "Who is who?",
               "instruction": "Your mother's sister is your …",
-              "options": ["aunt", "cousin", "grandmother", "sister"],
+              "options": [
+                "aunt",
+                "cousin",
+                "grandmother",
+                "sister"
+              ],
               "answerIndex": 0
             },
             {
@@ -24,10 +29,30 @@
               "instruction": "Complete with HAVE or HAS.",
               "text": "1. I ___ a big family.  2. She ___ two brothers.  3. They ___ a pet dog.  4. He ___ a little sister.",
               "blanks": [
-                { "answers": ["have"], "hint": "I / you / we / they" },
-                { "answers": ["has"], "hint": "she" },
-                { "answers": ["have"], "hint": "they" },
-                { "answers": ["has"], "hint": "he" }
+                {
+                  "answers": [
+                    "have"
+                  ],
+                  "hint": "I / you / we / they"
+                },
+                {
+                  "answers": [
+                    "has"
+                  ],
+                  "hint": "she"
+                },
+                {
+                  "answers": [
+                    "have"
+                  ],
+                  "hint": "they"
+                },
+                {
+                  "answers": [
+                    "has"
+                  ],
+                  "hint": "he"
+                }
               ]
             },
             {
@@ -50,7 +75,13 @@
               "type": "word-order",
               "title": "Describe the photo",
               "instruction": "Put the words in order.",
-              "words": ["This", "my", "is", "brother", "."],
+              "words": [
+                "This",
+                "my",
+                "is",
+                "brother",
+                "."
+              ],
               "answer": "This is my brother ."
             },
             {
@@ -59,10 +90,22 @@
               "title": "Family words",
               "instruction": "Match the person with their description.",
               "pairs": [
-                { "left": "father's mother", "right": "grandmother" },
-                { "left": "parents' children", "right": "brothers and sisters" },
-                { "left": "aunt's children", "right": "cousins" },
-                { "left": "mother's brother", "right": "uncle" }
+                {
+                  "left": "father's mother",
+                  "right": "grandmother"
+                },
+                {
+                  "left": "parents' children",
+                  "right": "brothers and sisters"
+                },
+                {
+                  "left": "aunt's children",
+                  "right": "cousins"
+                },
+                {
+                  "left": "mother's brother",
+                  "right": "uncle"
+                }
               ]
             }
           ]
@@ -83,7 +126,12 @@
               "type": "multiple-choice",
               "title": "What's on the farm?",
               "instruction": "Which animal does NOT live on a farm?",
-              "options": ["cow", "sheep", "penguin", "horse"],
+              "options": [
+                "cow",
+                "sheep",
+                "penguin",
+                "horse"
+              ],
               "answerIndex": 2
             },
             {
@@ -93,10 +141,30 @@
               "instruction": "Write the plural form of the animal in brackets.",
               "text": "1. I see three ___ (sheep) in the field.  2. There are five ___ (cow).  3. Two ___ (mouse) eat the cheese!  4. Look at those ___ (chicken)!",
               "blanks": [
-                { "answers": ["sheep"], "hint": "irregular — it doesn't change!" },
-                { "answers": ["cows"], "hint": "+ s" },
-                { "answers": ["mice"], "hint": "irregular" },
-                { "answers": ["chickens"], "hint": "+ s" }
+                {
+                  "answers": [
+                    "sheep"
+                  ],
+                  "hint": "irregular — it doesn't change!"
+                },
+                {
+                  "answers": [
+                    "cows"
+                  ],
+                  "hint": "+ s"
+                },
+                {
+                  "answers": [
+                    "mice"
+                  ],
+                  "hint": "irregular"
+                },
+                {
+                  "answers": [
+                    "chickens"
+                  ],
+                  "hint": "+ s"
+                }
               ]
             },
             {
@@ -119,10 +187,29 @@
               "title": "Animals & sounds",
               "instruction": "Match the animal with the sound it makes.",
               "pairs": [
-                { "left": "cow", "right": "moo" },
-                { "left": "sheep", "right": "baa" },
-                { "left": "duck", "right": "quack" },
-                { "left": "horse", "right": "neigh" }
+                {
+                  "left": "cow",
+                  "right": "moo"
+                },
+                {
+                  "left": "sheep",
+                  "right": "baa"
+                },
+                {
+                  "left": "duck",
+                  "right": "quack"
+                },
+                {
+                  "left": "horse",
+                  "right": "neigh"
+                }
+              ],
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "assets/farm-sounds.wav",
+                  "caption": "🎧 Listen to the farm song, then match each animal with its sound."
+                }
               ]
             },
             {
@@ -130,7 +217,15 @@
               "type": "word-order",
               "title": "There is / There are",
               "instruction": "Put the words in order.",
-              "words": ["are", "There", "pigs", "ten", "on", "the", "farm"],
+              "words": [
+                "are",
+                "There",
+                "pigs",
+                "ten",
+                "on",
+                "the",
+                "farm"
+              ],
               "answer": "There are ten pigs on the farm"
             },
             {
@@ -138,8 +233,20 @@
               "type": "multiple-choice",
               "title": "Can…?",
               "instruction": "“___ a horse swim?” — Choose the correct question word.",
-              "options": ["Can", "Is", "Do", "Does"],
-              "answerIndex": 0
+              "options": [
+                "Can",
+                "Is",
+                "Do",
+                "Does"
+              ],
+              "answerIndex": 0,
+              "media": [
+                {
+                  "type": "image",
+                  "src": "assets/farm.svg",
+                  "caption": "Look at the picture: can a horse swim?"
+                }
+              ]
             }
           ]
         }

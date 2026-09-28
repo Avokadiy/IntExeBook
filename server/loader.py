@@ -424,6 +424,15 @@ _TYPE_ICONS = {
     "multiple-choice": "🔤", "true-false": "☑️", "gap-fill": "✏️",
     "word-order": "🧩", "matching": "🔗",
 }
+_MEDIA_ICONS = {"image": "🖼️", "audio": "🎧", "video": "🎬"}
+
+
+def _task_icon(task: dict) -> str:
+    """Icon for a task in search results (media tasks get their own icon)."""
+    if task.get("type") == "media":
+        media = task.get("media") or [{}]
+        return _MEDIA_ICONS.get(media[0].get("type"), "🎬")
+    return _TYPE_ICONS.get(task.get("type"), "⭐")
 
 
 def search_all(query: str, limit: int = 60) -> list:

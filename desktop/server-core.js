@@ -391,6 +391,11 @@ function loadBookTree(idOrFolder, slot) {
 }
 
 /* Quick search across every textbook / unit / lesson / task title. */
+const MEDIA_ICONS = { image: "🖼️", audio: "🎧", video: "🎬" };
+function taskIcon(t) {
+  if (t.type === "media") return MEDIA_ICONS[(t.media || [])[0] && t.media[0].type] || "🎬";
+  return TYPE_ICONS[t.type] || "⭐";
+}
 function searchAll(query) {
   const tokens = String(query || "").toLowerCase().split(/\s+/).filter(Boolean);
   if (!tokens.length) return [];
@@ -426,7 +431,7 @@ function searchAll(query) {
             subtitle: `${card.title} · ${unit.title} · ${bookLabel}`, hash: lHash });
           for (const task of lesson.tasks || []) {
             if (matches(task.title)) results.push({ kind: "task",
-              icon: TYPE_ICONS[task.type] || "⭐", title: task.title,
+              icon: taskIcon(task), title: task.title,
               subtitle: `${card.title} · ${lesson.title} · ${bookLabel}`,
               hash: `${lHash}/play/${enc(task.id)}` });
           }
