@@ -86,6 +86,17 @@ function renderCrumbs(items) {
 async function route() {
   const parts = decodeURIComponent(location.hash.replace(/^#\/?/, "")).split("/").filter(Boolean);
   try {
+    if (parts[0] === "create") return renderCreate();
+    if (parts[0] === "import") return renderImport();
+    if (parts[0] === "edit" && parts[1] === "task" && parts.length >= 2)
+      return renderEditor({ mode: "task", tbId: parts[2], slot: parts[3], unitId: parts[4], lessonId: parts[5], taskId: parts[6] });
+    if (parts[0] === "edit" && parts[1] === "lesson" && parts.length >= 2)
+      return renderEditor({ mode: "lesson", tbId: parts[2], slot: parts[3], unitId: parts[4], lessonId: parts[5] });
+    if (parts[0] === "edit" && parts[1] === "unit" && parts.length >= 2)
+      return renderEditor({ mode: "unit", tbId: parts[2], slot: parts[3], unitId: parts[4] });
+    if (parts[0] === "edit" && parts[1] === "book" && parts.length >= 2)
+      return renderEditor({ mode: "book", tbId: parts[2], slot: parts[3] });
+    if (parts[0] === "edit") return renderEditor({ mode: "new" });
     if (parts.length === 0) return viewTextbooks();
     if (parts[0] === "tb" && parts.length === 2) return viewBooks(parts[1]);
     if (parts[0] === "tb" && parts.length === 3) return viewUnits(parts[1], parts[2]);
@@ -145,6 +156,19 @@ async function loadBook(tbId, slot) {
   }
   bookCache[key] = await getJSON(`/api/textbooks/${encodeURIComponent(tbId)}/book/${slot}`);
   return bookCache[key];
+}
+/* Full untrimmed book (task bodies included) — used by the editor. */
+async function loadBookRaw(tbId, slot) {
+  if (FILE_MODE) {
+    const tb = await loadBookMeta(tbId);
+    try {
+      return await loadLocalFile(`../textbooks/${tb.folder}/${slot}.json`);
+    } catch (e) {
+      const book = await loadBook(tbId, slot); // file:// fallback: tree only
+      return JSON.parse(JSON.stringify(book));
+    }
+  }
+  return getJSON(`/api/textbooks/${encodeURIComponent(tbId)}/raw/${slot}`);
 }
 /* Single task: the server endpoint returns it on its own; in file:// mode we
    simply pick it out of the already-loaded book tree. */
@@ -597,233 +621,260 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
       navigate(`#/tb/${encodeURIComponent(tbId)}/${slot}/${encodeURIComponent(unitId)}/${encodeURIComponent(lessonId)}`);
   }
 
-  /* ---------- engines per task type ---------- */
-  let renderEngine = { reset() {} };
+  /* ---------- engines per task type (shared with the authoring preview) ----------
+     makeRenderEngine(ctx) runs one of the five interactive engines against
+     ctx.task and renders it into ctx.body. The player builds a full context;
+     the editor's "Preview" tab passes a minimal one (see web/authoring.js). */
+  function makeRenderEngine(ctx) {
+    const body = ctx.body, task = ctx.task;
+    const feedback = ctx.feedback, btnNext = ctx.btnNext, btnRetry = ctx.btnRetry;
+    const state = ctx.state, idx = ctx.idx || 0;
+    const drawDots = ctx.drawDots || function () {};
+    let renderEngine = { reset() {} };
 
-  /* multiple choice */
-  function engineMC() {
-    let locked = false;
-    body.innerHTML = "";
-    (task.options || []).forEach((opt, i) => {
-      const b = document.createElement("button");
-      b.className = "opt-btn";
-      b.innerHTML = `<b>${String.fromCharCode(65 + i)}.</b>&nbsp; ${esc(opt)}`;
-      b.onclick = () => {
-        if (locked) return;
-        locked = true;
-        const ok = i === task.answerIndex;
-        [...body.children].forEach((el, j) => {
-          el.disabled = true;
-          if (j === task.answerIndex) el.classList.add("correct");
-          else if (j === i) el.classList.add("wrong");
-          else el.classList.add("dim");
-        });
-        setFeedback(ok, ok ? "" : (task.explanation || `The correct answer is “${task.options[task.answerIndex]}”.`));
-      };
-      body.appendChild(b);
-    });
-    renderEngine.reset = () => { locked = false; feedback.innerHTML = ""; btnNext.disabled = true; btnRetry.style.display = "none"; engineMC(); };
-  }
+    function setFeedback(ok, text) {
+      state.results[idx] = ok;
+      drawDots();
+      feedback.className = "feedback " + (ok ? "ok" : "bad");
+      feedback.innerHTML = (ok ? "\ud83c\udf89 Correct! " : "\u274c Not quite. ") +
+        (text ? `<div class="explain">${esc(text)}</div>` : "");
+      if (btnNext) btnNext.disabled = false;
+      if (btnRetry) btnRetry.style.display = ok ? "none" : "inline-flex";
+    }
 
-  /* true / false */
-  function engineTF() {
-    let locked = false;
-    const wrap = document.createElement("div");
-    wrap.className = "tf-wrap";
-    [[true, "TRUE ✔"], [false, "FALSE ✘"]].forEach(([val, label]) => {
-      const b = document.createElement("button");
-      b.className = "tf-btn";
-      b.textContent = label;
-      b.onclick = () => {
-        if (locked) return;
-        locked = true;
-        const ok = val === !!task.answer;
-        b.classList.add(ok ? "correct" : "wrong");
-        wrap.children.forEach(ch => { ch.disabled = true; if (ch !== b && !ok) ch.classList.add("correct"); });
-        setFeedback(ok, ok ? "" : (task.explanation || `The correct answer is ${task.answer ? "TRUE" : "FALSE"}.`));
-      };
-      wrap.appendChild(b);
-    });
-    body.appendChild(wrap);
-    renderEngine.reset = () => { locked = false; feedback.innerHTML = ""; btnNext.disabled = true; btnRetry.style.display = "none"; engineTF(); };
-  }
+    /* multiple choice */
+    function engineMC() {
+      let locked = false;
+      body.innerHTML = "";
+      (task.options || []).forEach((opt, i) => {
+        const b = document.createElement("button");
+        b.className = "opt-btn";
+        b.innerHTML = `<b>${String.fromCharCode(65 + i)}.</b>&nbsp; ${esc(opt)}`;
+        b.onclick = () => {
+          if (locked) return;
+          locked = true;
+          const ok = i === task.answerIndex;
+          [...body.children].forEach((el, j) => {
+            el.disabled = true;
+            if (j === task.answerIndex) el.classList.add("correct");
+            else if (j === i) el.classList.add("wrong");
+            else el.classList.add("dim");
+          });
+          setFeedback(ok, ok ? "" : (task.explanation || `The correct answer is \u201c${task.options[task.answerIndex]}\u201d.`));
+        };
+        body.appendChild(b);
+      });
+      renderEngine.reset = () => { locked = false; feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none"; engineMC(); };
+    }
 
-  /* gap fill */
-  function engineGap() {
-    const norm = s => String(s).trim().toLowerCase().replace(/[.,!?;]+$/g, "").replace(/\s+/g, " ");
-    const blanks = task.blanks || [];
-    const html = esc(task.text || "").replace(/_{2,}/g,
-      () => `<input class="gap-input" type="text" autocomplete="off">`);
-    body.innerHTML = `<div class="gap-text">${html}</div>`;
-    const inputs = [...body.querySelectorAll(".gap-input")];
-    inputs.forEach((inp, i) => {
-      const hint = blanks[i] && blanks[i].hint;
-      inp.insertAdjacentHTML("afterend",
-        hint ? ` <span class="hint-link" title="${esc(hint)}">💡 hint</span>` : " ");
-    });
-    body.querySelectorAll(".hint-link").forEach((h, i) => {
-      h.onclick = () => alert("💡 " + (blanks[i].hint || ""));
-    });
-    const check = () => {
-      let allOk = true;
+    /* true / false */
+    function engineTF() {
+      let locked = false;
+      const wrap = document.createElement("div");
+      wrap.className = "tf-wrap";
+      [[true, "TRUE \u2714"], [false, "FALSE \u2718"]].forEach(([val, label]) => {
+        const b = document.createElement("button");
+        b.className = "tf-btn";
+        b.textContent = label;
+        b.onclick = () => {
+          if (locked) return;
+          locked = true;
+          const ok = val === !!task.answer;
+          b.classList.add(ok ? "correct" : "wrong");
+          wrap.children.forEach(ch => { ch.disabled = true; if (ch !== b && !ok) ch.classList.add("correct"); });
+          setFeedback(ok, ok ? "" : (task.explanation || `The correct answer is ${task.answer ? "TRUE" : "FALSE"}.`));
+        };
+        wrap.appendChild(b);
+      });
+      body.appendChild(wrap);
+      renderEngine.reset = () => { locked = false; feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none"; engineTF(); };
+    }
+
+    /* gap fill */
+    function engineGap() {
+      const norm = s => String(s).trim().toLowerCase().replace(/[.,!?;]+$/g, "").replace(/\s+/g, " ");
+      const blanks = task.blanks || [];
+      const html = esc(task.text || "").replace(/_{2,}/g,
+        () => `<input class="gap-input" type="text" autocomplete="off">`);
+      body.innerHTML = `<div class="gap-text">${html}</div>`;
+      const inputs = [...body.querySelectorAll(".gap-input")];
       inputs.forEach((inp, i) => {
-        const answers = (blanks[i] && blanks[i].answers) || [];
-        const ok = answers.some(a => norm(a) === norm(inp.value));
-        inp.classList.toggle("correct", ok);
-        inp.classList.toggle("wrong", !ok);
-        if (!ok) allOk = false;
+        const hint = blanks[i] && blanks[i].hint;
+        inp.insertAdjacentHTML("afterend",
+          hint ? ` <span class="hint-link" title="${esc(hint)}">\ud83d\udca1 hint</span>` : " ");
       });
-      if (!allOk) inputs.forEach(inp => { if (inp.classList.contains("wrong")) setTimeout(() => inp.select(), 0); });
-      const solution = blanks.map(b => (b.answers || [""])[0]).join(", ");
-      setFeedback(allOk, allOk ? "" : (task.explanation || `Possible answers: ${solution}.`));
-    };
-    const bar = document.createElement("div");
-    bar.style.marginTop = "18px";
-    bar.innerHTML = `<button class="btn btn-primary" style="padding:10px 22px;font-size:15px">Check answers ✓</button>`;
-    bar.querySelector("button").onclick = check;
-    body.appendChild(bar);
-    inputs[inputs.length - 1] && (inputs[inputs.length - 1].addEventListener("keydown", e => { if (e.key === "Enter") check(); }));
-    renderEngine.reset = () => { feedback.innerHTML = ""; btnNext.disabled = true; btnRetry.style.display = "none"; engineGap(); };
-  }
+      body.querySelectorAll(".hint-link").forEach((hl, i) => {
+        hl.onclick = () => alert("\ud83d\udca1 " + (blanks[i].hint || ""));
+      });
+      const check = () => {
+        let allOk = true;
+        inputs.forEach((inp, i) => {
+          const answers = (blanks[i] && blanks[i].answers) || [];
+          const ok = answers.some(a => norm(a) === norm(inp.value));
+          inp.classList.toggle("correct", ok);
+          inp.classList.toggle("wrong", !ok);
+          if (!ok) allOk = false;
+        });
+        if (!allOk) inputs.forEach(inp => { if (inp.classList.contains("wrong")) setTimeout(() => inp.select(), 0); });
+        const solution = blanks.map(b => (b.answers || [""])[0]).join(", ");
+        setFeedback(allOk, allOk ? "" : (task.explanation || `Possible answers: ${solution}.`));
+      };
+      const bar = document.createElement("div");
+      bar.style.marginTop = "18px";
+      bar.innerHTML = `<button class="btn btn-primary" style="padding:10px 22px;font-size:15px">Check answers \u2713</button>`;
+      bar.querySelector("button").onclick = check;
+      body.appendChild(bar);
+      inputs[inputs.length - 1] && (inputs[inputs.length - 1].addEventListener("keydown", e => { if (e.key === "Enter") check(); }));
+      renderEngine.reset = () => { feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none"; engineGap(); };
+    }
 
-  /* word order */
-  function engineWO() {
-    const words = (task.words || []).slice();
-    const answerTokens = String(task.answer || words.join(" ")).split(/\s+/).filter(Boolean);
-    const shuffled = words.slice();
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    if (shuffled.join("|") === answerTokens.join("|") && shuffled.length > 1) shuffled.reverse();
-    let placed = [];
-    function draw() {
-      body.innerHTML = `
-        <div class="wo-sentence" id="woSent"><span style="color:#94a3b8" id="woPlaceholder">Tap the words below to build the sentence…</span></div>
-        <div class="wo-pool" id="woPool"></div>`;
-      const sent = document.getElementById("woSent");
-      const pool = document.getElementById("woPool");
-      placed.forEach((pi, pos) => {
-        const chip = document.createElement("button");
-        chip.className = "wo-word in-sentence";
-        chip.textContent = shuffled[pi];
-        chip.onclick = () => { if (!sent.classList.contains("graded")) { placed.splice(pos, 1); draw(); } };
-        sent.appendChild(chip);
-      });
-      shuffled.forEach((w, i) => {
-        if (placed.includes(i)) return;
-        const chip = document.createElement("button");
-        chip.className = "wo-word";
-        chip.textContent = w;
-        chip.onclick = () => { if (!sent.classList.contains("graded")) { placed.push(i); draw(); } };
-        pool.appendChild(chip);
-      });
-      const ready = placed.length === shuffled.length;
-      if (!document.getElementById("woCheck")) {
-        const bar = document.createElement("div");
-        bar.id = "woCheck"; bar.style.marginTop = "18px";
-        bar.innerHTML = `<button class="btn btn-primary" style="padding:10px 22px;font-size:15px" ${ready ? "" : "disabled"}>Check ✓</button>`;
-        bar.querySelector("button").onclick = check;
-        body.appendChild(bar);
-      } else {
-        document.getElementById("woCheck").querySelector("button").disabled = !ready;
+    /* word order */
+    function engineWO() {
+      const words = (task.words || []).slice();
+      const answerTokens = String(task.answer || words.join(" ")).split(/\s+/).filter(Boolean);
+      const shuffled = words.slice();
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
       }
-    }
-    function check() {
-      const user = placed.map(i => shuffled[i]);
-      const normTok = t => t.toLowerCase().replace(/[.?!,]+$/, "");
-      const ok = user.length === answerTokens.length &&
-        user.every((w, i) => normTok(w) === normTok(answerTokens[i]));
-      const sent = document.getElementById("woSent");
-      sent.classList.add("graded");
-      [...sent.children].forEach((chip, pos) => {
-        chip.classList.add(normTok(user[pos]) === normTok(answerTokens[pos]) ? "correct" : "wrong");
-      });
-      setFeedback(ok, ok ? "" : (task.explanation || `Correct sentence: “${answerTokens.join(" ")}”.`));
-    }
-    draw();
-    renderEngine.reset = () => { placed = []; feedback.innerHTML = ""; btnNext.disabled = true; btnRetry.style.display = "none"; draw(); };
-  }
-
-  /* matching */
-  function engineMatch() {
-    const pairs = (task.pairs || []).map((p, i) => ({ ...p, pid: i }));
-    const rights = pairs.slice();
-    for (let i = rights.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [rights[i], rights[j]] = [rights[j], rights[i]];
-    }
-    let selLeft = null, matched = 0, wrongFlash = null;
-    body.innerHTML = `
-      <div class="match-grid">
-        <div class="match-col" id="colL"></div>
-        <div class="match-col" id="colR"></div>
-      </div>`;
-    const colL = document.getElementById("colL"), colR = document.getElementById("colR");
-    pairs.forEach(p => {
-      const el = document.createElement("div");
-      el.className = "match-item"; el.textContent = p.left; el.dataset.pid = p.pid;
-      el.onclick = () => pick("L", p.pid, el);
-      colL.appendChild(el);
-    });
-    rights.forEach(p => {
-      const el = document.createElement("div");
-      el.className = "match-item"; el.textContent = p.right; el.dataset.pid = p.pid;
-      el.onclick = () => pick("R", p.pid, el);
-      colR.appendChild(el);
-    });
-    function pick(side, pid, el) {
-      if (el.classList.contains("locked")) return;
-      if (side === "L") {
-        if (selLeft && selLeft.el !== el) selLeft.el.classList.remove("selected");
-        selLeft = (selLeft && selLeft.el === el) ? null : { pid, el };
-        el.classList.toggle("selected", !!selLeft && selLeft.el === el);
-        return;
-      }
-      if (!selLeft) { el.animate([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }], { duration: 250 }); return; }
-      const leftEl = selLeft.el;
-      if (selLeft.pid === pid) {
-        leftEl.classList.remove("selected");
-        leftEl.classList.add("locked-ok", "locked");
-        el.classList.add("locked-ok", "locked");
-        matched++;
-        if (matched === pairs.length) {
-          // grade: perfect run only if no wrong attempt happened before
-          const hadMistake = state.results[idx] === false;
-          setFeedback(!hadMistake, "");
+      if (shuffled.join("|") === answerTokens.join("|") && shuffled.length > 1) shuffled.reverse();
+      let placed = [];
+      function draw() {
+        body.innerHTML = `
+          <div class="wo-sentence" id="woSent"><span style="color:#94a3b8" id="woPlaceholder">Tap the words below to build the sentence\u2026</span></div>
+          <div class="wo-pool" id="woPool"></div>`;
+        const sent = document.getElementById("woSent");
+        const pool = document.getElementById("woPool");
+        placed.forEach((pi, pos) => {
+          const chip = document.createElement("button");
+          chip.className = "wo-word in-sentence";
+          chip.textContent = shuffled[pi];
+          chip.onclick = () => { if (!sent.classList.contains("graded")) { placed.splice(pos, 1); draw(); } };
+          sent.appendChild(chip);
+        });
+        shuffled.forEach((w, i) => {
+          if (placed.includes(i)) return;
+          const chip = document.createElement("button");
+          chip.className = "wo-word";
+          chip.textContent = w;
+          chip.onclick = () => { if (!sent.classList.contains("graded")) { placed.push(i); draw(); } };
+          pool.appendChild(chip);
+        });
+        const ready = placed.length === shuffled.length;
+        if (!document.getElementById("woCheck")) {
+          const bar = document.createElement("div");
+          bar.id = "woCheck"; bar.style.marginTop = "18px";
+          bar.innerHTML = `<button class="btn btn-primary" style="padding:10px 22px;font-size:15px" ${ready ? "" : "disabled"}>Check \u2713</button>`;
+          bar.querySelector("button").onclick = check;
+          body.appendChild(bar);
+        } else {
+          document.getElementById("woCheck").querySelector("button").disabled = !ready;
         }
-      } else {
-        el.classList.add("locked-bad"); leftEl.classList.add("locked-bad");
-        leftEl.classList.remove("selected");
-        state.results[idx] = false; drawDots();
-        setTimeout(() => {
-          el.classList.remove("locked-bad"); leftEl.classList.remove("locked-bad");
-        }, 600);
       }
-      selLeft = null;
+      function check() {
+        const user = placed.map(i => shuffled[i]);
+        const normTok = t => t.toLowerCase().replace(/[.?!,]+$/, "");
+        const ok = user.length === answerTokens.length &&
+          user.every((w, i) => normTok(w) === normTok(answerTokens[i]));
+        const sent = document.getElementById("woSent");
+        sent.classList.add("graded");
+        [...sent.children].forEach((chip, pos) => {
+          chip.classList.add(normTok(user[pos]) === normTok(answerTokens[pos]) ? "correct" : "wrong");
+        });
+        setFeedback(ok, ok ? "" : (task.explanation || `Correct sentence: \u201c${answerTokens.join(" ")}\u201d.`));
+      }
+      draw();
+      renderEngine.reset = () => { placed = []; feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none"; draw(); };
     }
-    renderEngine.reset = () => {
-      selLeft = null; matched = 0;
-      feedback.innerHTML = ""; btnNext.disabled = true; btnRetry.style.display = "none";
-      engineMatch();
-    };
-  }
 
-  switch (task.type) {
-    case "multiple-choice": engineMC(); break;
-    case "true-false": engineTF(); break;
-    case "gap-fill": engineGap(); break;
-    case "word-order": engineWO(); break;
-    case "matching": engineMatch(); break;
-    default:
-      body.innerHTML = `<div class="error-box">Task type “${esc(task.type)}” is not supported yet.</div>`;
-      btnNext.disabled = false;
+    /* matching */
+    function engineMatch() {
+      const pairs = (task.pairs || []).map((p, i) => ({ ...p, pid: i }));
+      const rights = pairs.slice();
+      for (let i = rights.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [rights[i], rights[j]] = [rights[j], rights[i]];
+      }
+      let selLeft = null, matched = 0;
+      body.innerHTML = `
+        <div class="match-grid">
+          <div class="match-col" id="colL"></div>
+          <div class="match-col" id="colR"></div>
+        </div>`;
+      const colL = document.getElementById("colL"), colR = document.getElementById("colR");
+      pairs.forEach(p => {
+        const el = document.createElement("div");
+        el.className = "match-item"; el.textContent = p.left; el.dataset.pid = p.pid;
+        el.onclick = () => pick("L", p.pid, el);
+        colL.appendChild(el);
+      });
+      rights.forEach(p => {
+        const el = document.createElement("div");
+        el.className = "match-item"; el.textContent = p.right; el.dataset.pid = p.pid;
+        el.onclick = () => pick("R", p.pid, el);
+        colR.appendChild(el);
+      });
+      function pick(side, pid, el) {
+        if (el.classList.contains("locked")) return;
+        if (side === "L") {
+          if (selLeft && selLeft.el !== el) selLeft.el.classList.remove("selected");
+          selLeft = (selLeft && selLeft.el === el) ? null : { pid, el };
+          el.classList.toggle("selected", !!selLeft && selLeft.el === el);
+          return;
+        }
+        if (!selLeft) { el.animate([{ transform: "translateX(0)" }, { transform: "translateX(-6px)" }, { transform: "translateX(6px)" }, { transform: "translateX(0)" }], { duration: 250 }); return; }
+        const leftEl = selLeft.el;
+        if (selLeft.pid === pid) {
+          leftEl.classList.remove("selected");
+          leftEl.classList.add("locked-ok", "locked");
+          el.classList.add("locked-ok", "locked");
+          matched++;
+          if (matched === pairs.length) {
+            const hadMistake = state.results[idx] === false;
+            setFeedback(!hadMistake, "");
+          }
+        } else {
+          el.classList.add("locked-bad"); leftEl.classList.add("locked-bad");
+          leftEl.classList.remove("selected");
+          state.results[idx] = false; drawDots();
+          setTimeout(() => {
+            el.classList.remove("locked-bad"); leftEl.classList.remove("locked-bad");
+          }, 600);
+        }
+        selLeft = null;
+      }
+      renderEngine.reset = () => {
+        selLeft = null; matched = 0;
+        feedback.innerHTML = ""; if (btnNext) btnNext.disabled = true; if (btnRetry) btnRetry.style.display = "none";
+        engineMatch();
+      };
+    }
+
+    switch (task.type) {
+      case "multiple-choice": engineMC(); break;
+      case "true-false": engineTF(); break;
+      case "gap-fill": engineGap(); break;
+      case "word-order": engineWO(); break;
+      case "matching": engineMatch(); break;
+      default:
+        body.innerHTML = `<div class="error-box">Task type \u201c${esc(task.type)}\u201d is not supported yet.</div>`;
+        if (btnNext) btnNext.disabled = false;
+    }
+    return renderEngine;
   }
+  window.renderTaskEngine = makeRenderEngine;
+
+  let renderEngine = makeRenderEngine({ body, task, feedback, btnNext, btnRetry, state, idx, drawDots });
 }
 
 function viewNotFound() {
   app.innerHTML = `<div class="error-box">Page not found. <a href="#/">Go home</a></div>`;
 }
+
+/* ============================================================
+   AUTHORING — teachers create / edit exercises themselves
+   (web/authoring.js provides: renderCreate, renderImport, renderEditor)
+   ============================================================ */
 
 /* go! */
 initSearch();

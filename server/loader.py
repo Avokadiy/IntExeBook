@@ -49,10 +49,16 @@ import zipfile
 from typing import Any, Optional
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TEXTBOOKS_DIR = os.path.join(ROOT, "textbooks")
+TEXTBOOKS_DIR = os.environ.get("IEB_TEXTBOOKS") or os.path.join(ROOT, "textbooks")
+
+# where drafts of teacher-made courses are kept (autosave / restore)
+DRAFTS_DIR = os.environ.get("IEB_DRAFTS") or os.path.join(TEXTBOOKS_DIR, "_drafts")
 
 MANIFEST_NAMES = ("manifest.json", "manifest.yaml", "manifest.yml")
 ARCHIVE_EXTS = (".zip", ".tar.gz", ".tgz")
+PACK_EXT = ".iebpack.json"
+
+TASK_TYPES = ("multiple-choice", "true-false", "gap-fill", "word-order", "matching")
 
 
 class TextbookError(Exception):
@@ -394,8 +400,450 @@ def _unpack_into(archive: str, folder: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
+# authoring: validation, creating / editing textbooks, drafts and packs
+# --------------------------------------------------------------------------- #
+# These functions mirror web/shared.js (the single source of truth for the
+# content format).  The browser editor validates before saving; the server
+# re-validates everything it writes so a hand-edited or imported file can
+# never corrupt the textbook catalogue.
+
+import base64
+import binascii
+import re as _re
+
+
+def _s(v) -> str:
+    return v.strip() if isinstance(v, str) else ""
+
+
+def validate_task(raw: Any) -> dict:
+    """Return {'ok', 'errors', 'warnings', 'value'} for one task object."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    if not isinstance(raw, dict):
+        return {"ok": False, "errors": ["task must be an object"], "warnings": [], "value": None}
+    ttype = _s(raw.get("type"))
+    if ttype not in TASK_TYPES:
+        errors.append("unknown task type “%s”" % (ttype or "?"))
+    title = _s(raw.get("title")) or "Untitled task"
+    out: dict = {"id": _s(raw.get("id")) or "task", "type": ttype or "multiple-choice",
+                 "title": title, "instruction": _s(raw.get("instruction"))}
+
+    media_in = raw.get("media")
+    if media_in is not None:
+        if not isinstance(media_in, list):
+            errors.append("media must be a list")
+        else:
+            clean_media = []
+            for i, m in enumerate(media_in):
+                at = "media[%d]" % i
+                if not isinstance(m, dict):
+                    errors.append(at + " must be an object"); continue
+                mt = _s(m.get("type"))
+                if mt not in ("image", "audio", "video"):
+                    errors.append(at + ": type must be image, audio or video"); continue
+                src = _s(m.get("src"))
+                if not src:
+                    errors.append(at + ": file is missing"); continue
+                item = {"type": mt, "src": src}
+                if _s(m.get("caption")):
+                    item["caption"] = _s(m.get("caption"))
+                clean_media.append(item)
+            if clean_media:
+                out["media"] = clean_media
+    if _s(raw.get("explanation")):
+        out["explanation"] = _s(raw.get("explanation"))
+
+    if ttype == "multiple-choice":
+        opts = [_s(o) for o in raw.get("options") or []] if isinstance(raw.get("options"), list) else []
+        if len([o for o in opts if o]) < 2:
+            errors.append("needs at least 2 answer options")
+        try:
+            ai = int(raw.get("answerIndex"))
+        except (TypeError, ValueError):
+            ai = -1
+        if not (0 <= ai < len(opts)):
+            errors.append("no correct option marked")
+        out["options"] = opts
+        out["answerIndex"] = ai
+    elif ttype == "true-false":
+        if not isinstance(raw.get("answer"), bool):
+            errors.append("answer must be true or false")
+        out["answer"] = bool(raw.get("answer"))
+    elif ttype == "gap-fill":
+        text = _s(raw.get("text"))
+        n_gaps = len(_re.findall(r"_{2,}", text))
+        blanks = raw.get("blanks") if isinstance(raw.get("blanks"), list) else []
+        if not text:
+            errors.append("sentence text is empty")
+        if not n_gaps:
+            errors.append("no gaps found — use ___ in the text")
+        if n_gaps and len(blanks) != n_gaps:
+            errors.append("%d gap(s) in the text but %d answer(s) given" % (n_gaps, len(blanks)))
+        clean_blanks = []
+        for i, b in enumerate(blanks):
+            ans = [a for a in map(_s, (b.get("answers") if isinstance(b, dict) and isinstance(b.get("answers"), list) else [])) if a]
+            if not ans:
+                errors.append("gap %d has no accepted answer" % (i + 1))
+            item = {"answers": ans}
+            if isinstance(b, dict) and _s(b.get("hint")):
+                item["hint"] = _s(b.get("hint"))
+            clean_blanks.append(item)
+        out["text"] = text
+        out["blanks"] = clean_blanks
+    elif ttype == "word-order":
+        words = [_s(w) for w in (raw.get("words") or []) if _s(w)] if isinstance(raw.get("words"), list) else []
+        answer = _s(raw.get("answer")) or " ".join(words)
+        if len(words) < 2:
+            errors.append("needs at least 2 words")
+        tokens = [w for w in answer.split() if w]
+        if len(tokens) != len(words):
+            errors.append("the answer has %d word(s) but you provided %d tiles" % (len(tokens), len(words)))
+        else:
+            pool = sorted(w.lower() for w in words)
+            need = sorted(w.lower() for w in tokens)
+            if pool != need:
+                warnings.append("answer uses words that are not in the tile list")
+        out["words"] = words
+        out["answer"] = answer
+    elif ttype == "matching":
+        pairs = raw.get("pairs") if isinstance(raw.get("pairs"), list) else []
+        if len(pairs) < 2:
+            errors.append("needs at least 2 pairs")
+        seen: set = set()
+        clean_pairs = []
+        for i, p in enumerate(pairs):
+            l = _s(p.get("left")) if isinstance(p, dict) else ""
+            r = _s(p.get("right")) if isinstance(p, dict) else ""
+            if not l or not r:
+                errors.append("pair %d is incomplete (both sides needed)" % (i + 1))
+            elif l.lower() in seen:
+                errors.append("duplicate left item “%s”" % l)
+            else:
+                seen.add(l.lower())
+                clean_pairs.append({"left": l, "right": r})
+        out["pairs"] = clean_pairs
+
+    return {"ok": not errors, "errors": errors, "warnings": warnings, "value": out}
+
+
+def validate_book(data: Any) -> dict:
+    """Validate a student/workbook JSON tree. Returns {'ok','errors','warnings','stats','value'}."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    stats = {"units": 0, "lessons": 0, "tasks": 0}
+    if not isinstance(data, dict):
+        return {"ok": False, "errors": ["content must be a JSON object"], "warnings": warnings,
+                "stats": stats, "value": None}
+    units = data.get("units")
+    if not isinstance(units, list):
+        return {"ok": False, "errors": ['missing "units" array'], "warnings": warnings,
+                "stats": stats, "value": None}
+    if not units:
+        errors.append("there are no units yet — add at least one")
+    clean_units = []
+    seen_units: set = set()
+    for ui, u in enumerate(units):
+        u_at = "unit %d" % (ui + 1)
+        if not isinstance(u, dict):
+            errors.append(u_at + " must be an object"); continue
+        uid = _s(u.get("id")) or ("u%d" % (ui + 1))
+        if uid in seen_units:
+            errors.append('%s: duplicate unit id "%s"' % (u_at, uid)); continue
+        seen_units.add(uid)
+        if not _s(u.get("title")):
+            warnings.append('%s ("%s") has no title' % (u_at, uid))
+        lessons = u.get("lessons") if isinstance(u.get("lessons"), list) else []
+        if not lessons:
+            warnings.append('unit "%s" has no lessons' % (_s(u.get("title")) or uid))
+        clean_lessons = []
+        seen_lessons: set = set()
+        for li, l in enumerate(lessons):
+            l_at = "%s, lesson %d" % (u_at, li + 1)
+            if not isinstance(l, dict):
+                errors.append(l_at + " must be an object"); continue
+            lid = _s(l.get("id")) or ("l%d" % (li + 1))
+            if lid in seen_lessons:
+                errors.append('%s: duplicate lesson id "%s"' % (l_at, lid)); continue
+            seen_lessons.add(lid)
+            if not _s(l.get("title")):
+                warnings.append('%s ("%s") has no title' % (l_at, lid))
+            tasks = l.get("tasks") if isinstance(l.get("tasks"), list) else []
+            if not tasks:
+                warnings.append('lesson "%s" has no tasks' % (_s(l.get("title")) or lid))
+            clean_tasks = []
+            seen_tasks: set = set()
+            for ti, t in enumerate(tasks):
+                res = validate_task(t)
+                if not res["ok"]:
+                    errors.extend("%s, task %d: %s" % (l_at, ti + 1, e) for e in res["errors"])
+                    continue
+                warnings.extend("%s, task %d: %s" % (l_at, ti + 1, w) for w in res["warnings"])
+                tid = _s((t or {}).get("id") if isinstance(t, dict) else "") or ("t%d" % (ti + 1))
+                if tid in seen_tasks:
+                    errors.append('%s: duplicate task id "%s"' % (l_at, tid)); continue
+                seen_tasks.add(tid)
+                stats["tasks"] += 1
+                clean_tasks.append(res["value"])
+            try:
+                page: Optional[int] = int(l.get("page"))
+            except (TypeError, ValueError):
+                page = None
+            lesson_out = {"id": lid, "title": _s(l.get("title")), "tasks": clean_tasks}
+            if page is not None:
+                lesson_out["page"] = page
+            clean_lessons.append(lesson_out)
+        stats["lessons"] += len(clean_lessons)
+        clean_units.append({"id": uid, "title": _s(u.get("title")), "lessons": clean_lessons})
+    stats["units"] = len(clean_units)
+    value = {"format": 1, "units": clean_units}
+    return {"ok": not errors, "errors": errors, "warnings": warnings, "stats": stats, "value": value}
+
+
+def validate_manifest(m: Any) -> dict:
+    errors: list[str] = []
+    if not isinstance(m, dict):
+        return {"ok": False, "errors": ["manifest must be a JSON object"], "value": None}
+    if not _s(m.get("title")):
+        errors.append('manifest: "title" is required')
+    books = {}
+    for slot in ("student", "workbook"):
+        label = m.get(slot)
+        if isinstance(label, str) and label.strip():
+            books[slot] = label.strip()
+        elif label is True:
+            books[slot] = "Student's Book" if slot == "student" else "Workbook"
+    if not books:
+        errors.append('manifest: declare at least one book ("student" or "workbook")')
+    mid = _s(m.get("id")) or slugify(_s(m.get("title")) or "my-book")
+    color = _s(m.get("color"))
+    value = {
+        "format": 1,
+        "id": mid,
+        "title": _s(m.get("title")) or mid,
+        "color": color if _re.match(r"^#[0-9a-fA-F]{6}$", color) else "#6366f1",
+        "icon": _s(m.get("icon")) or "📕",
+    }
+    for key in ("subtitle", "level", "publisher", "description", "author", "created"):
+        v = _s(m.get(key))
+        if v:
+            value[key] = v
+    if not value.get("created"):
+        value["created"] = __import__("datetime").date.today().isoformat()
+    value.update(books)
+    return {"ok": not errors, "errors": errors, "value": value}
+
+
+_CYR = {"а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e", "ж": "zh", "з": "z",
+        "и": "i", "й": "y", "к": "k", "л": "l", "м": "m", "н": "n", "о": "o", "п": "p", "р": "r",
+        "с": "s", "т": "t", "у": "u", "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh",
+        "щ": "sch", "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya"}
+
+
+def slugify(text: str) -> str:
+    s = str(text or "").lower()
+    s = "".join(_CYR.get(ch, ch if ord(ch) < 128 else "") for ch in s)
+    s = _re.sub(r"[^a-z0-9]+", "-", s).strip("-")[:40]
+    return s or "x"
+
+
+def safe_asset_name(rel: str) -> Optional[str]:
+    """Normalise an uploaded asset path; reject anything escaping the folder."""
+    rel = str(rel or "").replace("\\", "/").lstrip("/")
+    parts = [p for p in rel.split("/") if p not in ("", ".", "..")]
+    if not parts or len(parts) > 4:
+        return None
+    cleaned = []
+    for p in parts:
+        p = _re.sub(r"[^\w.\-\u0400-\u04FF ]+", "_", p, flags=_re.UNICODE).strip(" .")
+        if not p:
+            return None
+        cleaned.append(p)
+    return "/".join(cleaned)
+
+
+MAX_ASSET_BYTES = 40 * 1024 * 1024      # 40 MB per file
+MAX_BODY_BYTES = 64 * 1024 * 1024       # 64 MB per request
+
+
+def unique_folder(base: str) -> str:
+    """textbooks/<base> with a numeric suffix if the name is taken."""
+    os.makedirs(TEXTBOOKS_DIR, exist_ok=True)
+    folder = os.path.join(TEXTBOOKS_DIR, base)
+    if not os.path.exists(folder):
+        return folder
+    n = 2
+    while os.path.exists(os.path.join(TEXTBOOKS_DIR, "%s-%d" % (base, n))):
+        n += 1
+    return os.path.join(TEXTBOOKS_DIR, "%s-%d" % (base, n))
+
+
+def write_textbook(folder: str, manifest: dict, books: dict, assets: Optional[dict] = None) -> None:
+    """Persist a whole course package on disk (manifest + book JSONs + assets)."""
+    os.makedirs(folder, exist_ok=True)
+    with open(os.path.join(folder, "manifest.json"), "w", encoding="utf-8") as fh:
+        json.dump(manifest, fh, ensure_ascii=False, indent=2)
+    for slot, data in (books or {}).items():
+        if slot not in ("student", "workbook"):
+            continue
+        with open(os.path.join(folder, slot + ".json"), "w", encoding="utf-8") as fh:
+            json.dump(data, fh, ensure_ascii=False, indent=2)
+    for rel, data_url in (assets or {}).items():
+        rel = safe_asset_name(str(rel)[7:] if str(rel).startswith("assets/") else rel)
+        if not rel:
+            continue
+        dest = _safe_join(folder, "assets", *rel.split("/"))
+        raw = _decode_data_url(data_url)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        with open(dest, "wb") as fh:
+            fh.write(raw)
+
+
+def _decode_data_url(url: str) -> bytes:
+    url = str(url or "").strip()
+    m = _re.match(r"^data:([\w./+-]+)?;base64,([\s\S]+)$", url)
+    if not m:
+        raise TextbookError("asset must be a base64 data URL")
+    try:
+        raw = base64.b64decode(m.group(2), validate=True)
+    except (binascii.Error, ValueError):
+        raise TextbookError("asset has invalid base64 data")
+    if len(raw) > MAX_ASSET_BYTES:
+        raise TextbookError("asset is too large (max 40 MB)")
+    return raw
+
+
+# --------------------------------------------------------------- drafts
+def _draft_file(name: str) -> str:
+    safe = _re.sub(r"[^\w.\-]", "_", str(name or "draft"), flags=_re.UNICODE)[:80] or "draft"
+    return os.path.join(DRAFTS_DIR, safe + ".json")
+
+
+def save_draft(name: str, payload: dict) -> str:
+    os.makedirs(DRAFTS_DIR, exist_ok=True)
+    path = _draft_file(name)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(payload, fh, ensure_ascii=False)
+    os.replace(tmp, path)
+    return path
+
+
+def load_draft(name: str) -> Optional[dict]:
+    path = _draft_file(name)
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except Exception:
+        return None
+
+
+def list_drafts() -> list:
+    if not os.path.isdir(DRAFTS_DIR):
+        return []
+    out = []
+    for f in sorted(os.listdir(DRAFTS_DIR)):
+        if not f.endswith(".json"):
+            continue
+        try:
+            with open(os.path.join(DRAFTS_DIR, f), encoding="utf-8") as fh:
+                d = json.load(fh)
+        except Exception:
+            continue
+        out.append({
+            "name": f[:-5],
+            "title": (d.get("manifest") or {}).get("title") or f[:-5],
+            "updated": d.get("updated") or "",
+            "tasks": (d.get("stats") or {}).get("tasks"),
+        })
+    return out
+
+
+def delete_draft(name: str) -> bool:
+    path = _draft_file(name)
+    if os.path.isfile(path):
+        os.remove(path)
+        return True
+    return False
+
+
+# --------------------------------------------------------------- create / edit
+def create_textbook(payload: dict) -> dict:
+    """Create a brand-new teacher-made course from the editor payload."""
+    mf = validate_manifest(payload.get("manifest"))
+    if not mf["ok"]:
+        raise TextbookError("; ".join(mf["errors"]))
+    manifest = mf["value"]
+    books_raw = payload.get("books") or {}
+    books = {}
+    all_errors: list[str] = []
+    for slot in ("student", "workbook"):
+        if slot not in books_raw or not books_raw[slot]:
+            continue
+        vb = validate_book(books_raw[slot])
+        all_errors.extend("%s: %s" % (slot, e) for e in vb["errors"])
+        books[slot] = vb["value"]
+    if all_errors:
+        raise TextbookError("; ".join(all_errors[:8]))
+    if not books:
+        raise TextbookError("nothing to save — the course has no content")
+
+    folder = unique_folder(slugify(manifest["id"] or manifest["title"]))
+    manifest["id"] = os.path.basename(folder)
+    assets = payload.get("assets") or {}
+    write_textbook(folder, manifest, books, assets)
+    invalidate_cache()
+    return {"folder": os.path.basename(folder), "id": manifest["id"], "title": manifest["title"]}
+
+
+def patch_textbook(id_or_folder: str, payload: dict) -> dict:
+    """Overwrite manifest and/or book files of an existing course."""
+    folder, manifest = get_textbook_meta(id_or_folder)
+    if payload.get("manifest"):
+        mf = validate_manifest(dict(manifest, **payload["manifest"]))
+        if not mf["ok"]:
+            raise TextbookError("; ".join(mf["errors"]))
+        manifest = mf["value"]
+        manifest["id"] = manifest.get("id") or os.path.basename(folder)
+    books = {}
+    errs: list[str] = []
+    for slot in ("student", "workbook"):
+        if slot in (payload.get("books") or {}):
+            vb = validate_book(payload["books"][slot])
+            if not vb["ok"]:
+                errs.extend("%s: %s" % (slot, e) for e in vb["errors"][:6])
+            else:
+                books[slot] = vb["value"]
+    if errs:
+        raise TextbookError("; ".join(errs))
+    write_textbook(folder, manifest, books, payload.get("assets") or {})
+    invalidate_cache()
+    return {"folder": os.path.basename(folder), "id": manifest.get("id"), "title": manifest.get("title")}
+
+
+def import_pack(pack: dict, new_id: Optional[str] = None) -> dict:
+    """Install a shared ".iebpack.json" bundle as a new local course."""
+    if not isinstance(pack, dict) or pack.get("format") != "ieb-pack":
+        raise TextbookError("this is not an IntExeBook exercise pack (.iebpack.json)")
+    payload = {"manifest": pack.get("manifest"), "books": pack.get("books"), "assets": pack.get("assets")}
+    if new_id:
+        payload["manifest"] = dict(payload["manifest"] or {}, id=slugify(new_id))
+    return create_textbook(payload)
+
+
+# --------------------------------------------------------------------------- #
 # public API
 # --------------------------------------------------------------------------- #
+_scan_cache: Optional[tuple] = None
+
+
+def invalidate_cache() -> None:
+    global _scan_cache
+    _scan_cache = None
+
+
 def scan_textbooks() -> list[dict]:
     """Return lightweight cards for every textbook found in /textbooks."""
     os.makedirs(TEXTBOOKS_DIR, exist_ok=True)
