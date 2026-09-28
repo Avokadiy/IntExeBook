@@ -357,6 +357,49 @@ function findTask(book, unitId, lessonId, taskId) {
   throw new TextbookError(`Task not found: ${unitId}/${lessonId}/${taskId}`);
 }
 
+/* Resolve a textbook by folder name OR by its manifest "id" (the front-end
+   uses ids in the URLs).  Mirrors server/loader.py get_textbook_meta(). */
+function resolveTextbook(idOrFolder) {
+  const direct = path.join(TEXTBOOKS_DIR, idOrFolder);
+  if (fs.existsSync(direct)) {
+    const folder = ensureFolder(idOrFolder);
+    if (folder) {
+      const mp = findManifest(folder);
+      if (mp) return { folder, manifest: readManifest(mp) };
+    }
+  }
+  for (const card of scanTextbooks()) {
+    if (card.error) continue;
+    if (card.id === idOrFolder || card.folder === idOrFolder) {
+      const folder = path.join(TEXTBOOKS_DIR, card.folder);
+      const mp = findManifest(folder);
+      if (mp) return { folder, manifest: readManifest(mp) };
+    }
+  }
+  throw new TextbookError("Textbook not found: " + idOrFolder);
+}
+
+/* Load one book (student/workbook) and strip task bodies down to summaries. */
+function loadBookTree(idOrFolder, slot) {
+  const { folder, manifest } = resolveTextbook(idOrFolder);
+  const book = JSON.parse(JSON.stringify(loadBook(folder, manifest, slot)));
+  for (const u of book.units) for (const l of u.lessons || []) {
+    l.tasks = (l.tasks || []).map(t => ({ id: t.id, title: t.title || "", type: t.type || "" }));
+    l.task_count = l.tasks.length;
+  }
+  return book;
+}
+
+/* Load a single full task object. */
+function loadTaskFull(idOrFolder, slot, unitId, lessonId, taskId) {
+  const { folder, manifest } = resolveTextbook(idOrFolder);
+  const book = loadBook(folder, manifest, slot);
+  const task = Object.assign({}, findTask(book, unitId, lessonId, taskId));
+  task.book_label = book.book_label;
+  task.textbook_title = book.textbook_title;
+  return task;
+}
+
 /* ------------------------------------------------------------ HTTP server */
 const MIME = {
   ".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
@@ -394,28 +437,26 @@ function handle(req, res) {
       if (rel.startsWith("..") || path.isAbsolute(rel)) return sendJson(res, { error: "Bad request" }, 400);
       return sendFile(res, path.join(WEB_DIR, rel));
     }
+    // also serve web/ files by plain relative name so index.html can use the
+    // same <link href="style.css"> as in file:// mode
+    if (!pathname.slice(1).includes("/")) {
+      const direct = path.normalize(pathname.slice(1));
+      if (direct && !direct.startsWith("..") && fs.existsSync(path.join(WEB_DIR, direct)) &&
+          fs.statSync(path.join(WEB_DIR, direct)).isFile()) {
+        return sendFile(res, path.join(WEB_DIR, direct));
+      }
+    }
     const parts = pathname.split("/").filter(Boolean);
     if (parts.length === 2 && parts[0] === "api" && parts[1] === "ping") {
       return sendJson(res, { ok: true, engine: "node" });
     }
     if (parts.join("/") === "api/textbooks") return sendJson(res, { textbooks: scanTextbooks() });
     if (parts.length === 5 && parts[0] === "api" && parts[1] === "textbooks" && parts[3] === "book") {
-      const { folder, manifest } = getTextbookMeta(parts[2]);
-      const book = JSON.parse(JSON.stringify(loadBook(folder, manifest, parts[4])));
-      for (const u of book.units) for (const l of u.lessons || []) {
-        l.tasks = (l.tasks || []).map(t => ({ id: t.id, title: t.title || "", type: t.type || "" }));
-        l.task_count = l.tasks.length;
-      }
-      return sendJson(res, book);
+      return sendJson(res, loadBookTree(parts[2], parts[4]));
     }
     if (parts.length === 8 && parts[0] === "api" && parts[1] === "textbooks" && parts[3] === "task") {
       const [, , tbId, , slot, unitId, lessonId, taskId] = parts;
-      const { folder, manifest } = getTextbookMeta(tbId);
-      const book = loadBook(folder, manifest, slot);
-      const task = Object.assign({}, findTask(book, unitId, lessonId, taskId));
-      task.book_label = book.book_label;
-      task.textbook_title = book.textbook_title;
-      return sendJson(res, task);
+      return sendJson(res, loadTaskFull(tbId, slot, unitId, lessonId, taskId));
     }
     if (parts[0] === "assets" && parts.length >= 3) {
       const { folder } = getTextbookMeta(parts[1]);
