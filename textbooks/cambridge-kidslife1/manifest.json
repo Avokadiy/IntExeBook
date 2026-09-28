@@ -1,0 +1,13 @@
+{
+  "id": "kidslife-1",
+  "title": "Kids' Life Explorer",
+  "subtitle": "Level 1 · Elementary",
+  "level": "CEFR A1",
+  "publisher": "Example content for demo purposes",
+  "description": "CLIL-style course for young learners: family, animals, the body and everyday English.",
+  "cover": "",
+  "color": "#f59e0b",
+  "icon": "🌍",
+  "student": "Student's Book",
+  "workbook": "Workbook"
+}
