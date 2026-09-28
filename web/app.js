@@ -400,10 +400,21 @@ var TYPE_ICONS = {
    served by the local backend at /assets/<book>/...; in file:// mode they
    resolve against the textbook folder next to web/. */
 const MEDIA_TAGS = { image: "🖼️", audio: "🎧", video: "🎬" };
+/* Media sources in task JSON are relative to the textbook folder, e.g.
+   "assets/farm.wav".  Normalize them so they work no matter which
+   identifier ended up in the URL (folder name or manifest id) and whether
+   a manifest already used an absolute "/assets/..." path. */
+function normalizeMediaSrc(src) {
+  let s = String(src || "").replace(/\\/g, "/").replace(/^\/+/, "");
+  // strip a leading "<something>/" when the next segment is "assets"
+  s = s.replace(/^[^/]+\/(?=assets\/)/, "");
+  return s;
+}
 function mediaSrc(tbId, src) {
-  if (/^(https?:|data:|\/)/.test(src)) return src;
-  const rel = "../textbooks/" + encodeURIComponent(tbId) + "/" + src;
-  return FILE_MODE ? rel : "/assets/" + encodeURIComponent(tbId) + "/" + src;
+  if (/^(https?:|data:)/.test(src)) return src;
+  const norm = normalizeMediaSrc(src);
+  const rel = "../textbooks/" + encodeURIComponent(tbId) + "/" + norm;
+  return FILE_MODE ? rel : "/assets/" + encodeURIComponent(tbId) + "/" + norm;
 }
 function hasMedia(task) {
   return Array.isArray(task.media) && task.media.length > 0;
