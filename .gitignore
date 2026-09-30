@@ -1,0 +1,25 @@
+# Dependencies (NEVER commit — contains 177MB electron binary, breaks GitHub push)
+node_modules/
+
+# Build artifacts
+dist/
+build/
+out/
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Large source materials (PDF textbooks kept on disk only, not in git)
+selem/
+selem_src/
+*.pdf
+
+# Archives
+*.zip
+
+# Logs and temp files
+*.log
+
+# Git bundles
+*.bundle
