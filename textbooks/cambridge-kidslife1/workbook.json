@@ -1,0 +1,130 @@
+{
+  "units": [
+    {
+      "id": "u1",
+      "title": "Unit 1 — My family",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Worksheet 1 — Possessives",
+          "page": 6,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "gap-fill",
+              "title": "My / your / his / her",
+              "instruction": "Complete with the correct possessive adjective.",
+              "text": "1. I have a sister. ___ name is Anna.  2. Tom has a dog. ___ dog is big.  3. You have a book. Is this ___ book?  4. She has a brother. ___ brother is funny.",
+              "blanks": [
+                { "answers": ["my"], "hint": "about me" },
+                { "answers": ["his"], "hint": "Tom = boy" },
+                { "answers": ["your"], "hint": "about you" },
+                { "answers": ["her"], "hint": "She = girl" }
+              ]
+            },
+            {
+              "id": "t2",
+              "type": "multiple-choice",
+              "title": "Apostrophe s",
+              "instruction": "Choose the correct sentence.",
+              "options": [
+                "This is Marys bag.",
+                "This is Mary's bag.",
+                "This is Marys' bag.",
+                "This is sMary bag."
+              ],
+              "answerIndex": 1
+            }
+          ]
+        },
+        {
+          "id": "l2",
+          "title": "Worksheet 2 — Reading: Sam's family",
+          "page": 8,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "true-false",
+              "title": "Read: “Hi, I'm Sam. I have two sisters, Emma and Lily. We don't have a brother!”",
+              "instruction": "Sam has one sister.",
+              "answer": false,
+              "explanation": "Sam has two sisters: Emma and Lily."
+            },
+            {
+              "id": "t2",
+              "type": "word-order",
+              "title": "About Sam",
+              "instruction": "Put the words in order.",
+              "words": ["don't", "We", "a", "have", "brother", "."],
+              "answer": "We don't have a brother ."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u2",
+      "title": "Unit 2 — Farm animals",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Worksheet 1 — Counting animals",
+          "page": 14,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "gap-fill",
+              "title": "How many?",
+              "instruction": "Look at the numbers and complete: 4 cows, 2 horses, 1 sheep.",
+              "text": "There are ___ cows, ___ horses and one ___ on the farm.",
+              "blanks": [
+                { "answers": ["4", "four"], "hint": "cows" },
+                { "answers": ["2", "two"], "hint": "horses" },
+                { "answers": ["sheep"], "hint": "singular AND plural!" }
+              ]
+            },
+            {
+              "id": "t2",
+              "type": "matching",
+              "title": "Baby animals",
+              "instruction": "Match the adult animal with its baby.",
+              "pairs": [
+                { "left": "cow", "right": "calf" },
+                { "left": "hen", "right": "chick" },
+                { "left": "sheep", "right": "lamb" },
+                { "left": "horse", "right": "foal" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "l2",
+          "title": "Worksheet 2 — Can / can't",
+          "page": 16,
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "multiple-choice",
+              "title": "Animal abilities",
+              "instruction": "A penguin ___ fly, but it ___ swim very well.",
+              "options": [
+                "can / can't",
+                "can't / can",
+                "can / can",
+                "can't / can't"
+              ],
+              "answerIndex": 1
+            },
+            {
+              "id": "t2",
+              "type": "true-false",
+              "title": "Farm facts",
+              "instruction": "Cows eat grass.",
+              "answer": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

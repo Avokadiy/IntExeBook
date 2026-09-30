@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+out/
+__pycache__/
+*.pyc
+selem/
+selem_src/
+*.bundle
+*.zip
+*.pdf
