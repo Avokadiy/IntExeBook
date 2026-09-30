@@ -94,6 +94,7 @@ async function route() {
   try {
     if (parts[0] === "create") { authoring(); return window.renderCreate(); }
     if (parts[0] === "import") { authoring(); return window.renderImport(); }
+    if (parts[0] === "import-zip") { authoring(); return window.renderImportZip(); }
     if (parts[0] === "edit" && parts[1] === "task" && parts.length >= 2) {
       authoring();
       return window.renderEditor({ mode: "task", tbId: parts[2], slot: parts[3], unitId: parts[4], lessonId: parts[5], taskId: parts[6] });

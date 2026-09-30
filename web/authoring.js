@@ -185,6 +185,7 @@
       { icon: "✨", title: "New course", desc: "Start a standalone set of exercises with its own units and lessons.", act: () => location.hash = "#/edit/new" },
       { icon: "📕", title: "Add to a textbook", desc: "Attach new tasks to an existing unit, lesson or topic of any installed book.", act: () => pickTextbook() },
       { icon: "📥", title: "Import pack", desc: "Install a *.iebpack.json shared by another teacher.", act: () => location.hash = "#/import" },
+      { icon: "📚", title: "Import textbook (.zip)", desc: "Add a whole textbook with audio/video/images from a ZIP archive (up to 500 MB).", act: () => location.hash = "#/import-zip" },
     ];
     cards.forEach(c => {
       const card = h("div", { class: "card", style: "cursor:pointer" }, [
@@ -383,6 +384,115 @@
   function invalidateCaches() {
     Object.keys(bookCache).forEach(k => delete bookCache[k]);
     Object.keys(taskCache).forEach(k => delete taskCache[k]);
+  }
+
+  /* ======================================================== #/import-zip
+     Bulk import of a whole textbook (with audio/video/images) from a ZIP
+     archive.  The archive keeps the standard layout:
+
+         <folder>/manifest.json      required — id, title, "student"/"workbook"
+         <folder>/student.json       optional — units → lessons → tasks
+         <folder>/workbook.json      optional
+         <folder>/assets/**          any mp3/mp4/png/jpg… files
+
+     Media paths inside student/workbook JSON are relative ("assets/audio/x.mp3"),
+     exactly what the player expects.  Binary files go to the server as raw
+     bytes (no base64), so archives up to ~500 MB import fine. */
+  function renderImportZip() {
+    renderCrumbs([{ label: "🏠 Textbooks", href: "#/" }, { label: "📚 Import textbook (.zip)" }]);
+    app.innerHTML = `
+      <section>
+        <h2 class="step-title"><span class="stepnum">⇪</span> Import a textbook from a ZIP archive</h2>
+        <p class="instr" style="color:var(--muted)">Best for big books with lots of audio / video (up to ~500&nbsp;MB).
+        The archive must contain <code>manifest.json</code>, <code>student.json</code> and/or
+        <code>worbook.json</code> and an <code>assets/</code> folder — see
+        <code>textbooks/_TEMPLATE</code> for the exact format.</p>
+        <div class="ed-drop" id="zipDrop">
+          <div style="font-size:40px">🗜️</div>
+          <div><strong>Drop the .zip here</strong> or click to choose a file</div>
+          <input type="file" id="zipFile" accept=".zip,application/zip" style="display:none">
+        </div>
+        <div id="zipInfo"></div>
+        <details class="hint-card" style="margin-top:16px">
+          <summary>What should be inside the archive?</summary>
+          <pre style="white-space:pre-wrap;font-size:13px;margin-top:8px">my-textbook/
+├── manifest.json      {"id":"my-book","title":"My Book","student":"Student's Book"}
+├── student.json       {"units":[{"id":"u1","title":"Unit 1","lessons":[…tasks…]}]}
+├── workbook.json      (optional, same schema)
+└── assets/
+    ├── audio/unit1-track1.mp3
+    └── images/page-8.png   ← reference them in tasks as "assets/audio/unit1-track1.mp3"</pre>
+        </details>
+      </section>`;
+    const zone = document.getElementById("zipDrop");
+    const fi = document.getElementById("zipFile");
+    zone.onclick = () => fi.click();
+    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("over"); });
+    zone.addEventListener("dragleave", () => zone.classList.remove("over"));
+    zone.addEventListener("drop", (e) => {
+      e.preventDefault(); zone.classList.remove("over");
+      if (e.dataTransfer.files[0]) importZipFile(e.dataTransfer.files[0]);
+    });
+    fi.onchange = () => fi.files[0] && importZipFile(fi.files[0]);
+  }
+
+  async function importZipFile(file) {
+    const info = document.getElementById("zipInfo");
+    if (!/\.zip$/i.test(file.name)) {
+      info.innerHTML = `<div class="error-box">Please choose a .zip archive (for a single-file pack use “Import pack”).</div>`;
+      return;
+    }
+    if (FILE_MODE || !API) {
+      info.innerHTML = `<div class="error-box">ZIP import needs the local server — start it with <b>start.bat</b> / <b>python server/app.py</b> and open http://127.0.0.1:8000</div>`;
+      return;
+    }
+    const mb = (file.size / 1024 / 1024).toFixed(1);
+    info.innerHTML = "";
+    const box = h("div", { class: "hint-card" }, [
+      h("strong", null, "📤 Uploading “" + file.name + "” (" + mb + " MB)…"),
+      (() => { const bar = h("div", { class: "ed-progress" }, [h("div", { class: "ed-progress-fill", id: "zipBar" })]); return bar; })(),
+      h("div", { id: "zipPhase", class: "meta" }, "sending file to the local server…")
+    ]);
+    info.appendChild(box);
+
+    try {
+      const res = await uploadZipWithProgress(API + "/api/import-zip", file,
+        (frac) => { const b = document.getElementById("zipBar"); if (b) b.style.width = Math.round(frac * 100) + "%"; },
+        (phase) => { const p = document.getElementById("zipPhase"); if (p) p.textContent = phase; });
+      invalidateCaches();
+      const skippedNote = (res.assets_skipped && res.assets_skipped.length)
+        ? `<br><span class="meta">${res.assets_skipped.length} non-media file(s) were skipped.</span>` : "";
+      info.innerHTML = `<div class="hint-card" style="border-color:var(--ok,#16a34a)">
+        <strong>✅ “${esc(res.title)}” imported!</strong><br>
+        ${res.assets_imported || 0} media file(s), books: ${(res.books || []).join(", ") || "—"}.
+        ${skippedNote}</div>`;
+      toast("Textbook imported", "ok");
+      setTimeout(() => { location.hash = "#/tb/" + encodeURIComponent(res.folder); }, 900);
+    } catch (e) {
+      info.innerHTML = `<div class="error-box">Import failed: ${esc(String(e.message || e))}</div>`;
+    }
+  }
+
+  /* XMLHttpRequest upload — fetch can't report upload progress on Chrome */
+  function uploadZipWithProgress(url, file, onProgress, onPhase) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", url);
+      xhr.upload.onprogress = (ev) => {
+        if (ev.lengthComputable) onProgress(ev.loaded / ev.total);
+      };
+      xhr.upload.onload = () => onPhase("server is unpacking & validating the archive…");
+      xhr.onload = () => {
+        let data = {};
+        try { data = JSON.parse(xhr.responseText || "{}"); } catch (e) { /* html error page */ }
+        if (xhr.status >= 200 && xhr.status < 300 && data.ok !== false && !data.error) resolve(data);
+        else reject(new Error(data.error || ("HTTP " + xhr.status)));
+      };
+      xhr.onerror = () => reject(new Error("network error — is the server still running?"));
+      xhr.ontimeout = () => reject(new Error("upload timed out"));
+      xhr.timeout = 15 * 60 * 1000; // 15 min for very large archives
+      xhr.send(file);
+    });
   }
 
   function blankTask(type) {
@@ -1372,5 +1482,6 @@
   /* ============================================================ exports */
   window.renderCreate = renderCreate;
   window.renderImport = renderImport;
+  window.renderImportZip = renderImportZip;
   window.renderEditor = renderEditor;
 })();

@@ -552,6 +552,8 @@ select.ed-input { appearance: auto; }
   transition: border-color .15s, background .15s;
 }
 .ed-drop:hover, .ed-drop.over { border-color: var(--accent); background: var(--hover-bg); color: var(--ink); }
+.ed-progress { height: 8px; border-radius: 6px; background: var(--chip-bg, #e5e7eb); overflow: hidden; margin: 10px 0 6px; }
+.ed-progress-fill { height: 100%; width: 0%; border-radius: 6px; background: linear-gradient(90deg, var(--accent), var(--accent-2, #a78bfa)); transition: width .25s ease; }
 
 /* toast notifications */
 .ed-toast {

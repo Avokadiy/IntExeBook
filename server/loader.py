@@ -833,7 +833,7 @@ def safe_asset_name(rel: str) -> Optional[str]:
 
 
 MAX_ASSET_BYTES = 40 * 1024 * 1024      # 40 MB per file
-MAX_BODY_BYTES = 64 * 1024 * 1024       # 64 MB per request
+MAX_BODY_BYTES = 512 * 1024 * 1024      # 512 MB per request (bulk textbook import)
 
 
 def unique_folder(base: str, base_dir: Optional[str] = None) -> str:
@@ -1094,6 +1094,156 @@ def import_pack(pack: dict, new_id: Optional[str] = None) -> dict:
     if new_id:
         payload["manifest"] = dict(payload["manifest"] or {}, id=slugify(new_id))
     return create_textbook(payload)
+
+
+# --------------------------------------------------------------- bulk import
+# A whole textbook with hundreds of MB of audio/video cannot travel inside a
+# JSON body efficiently, so teachers can also upload it as a ZIP archive that
+# already has the textbook layout (manifest.json + student/workbook.json +
+# assets/).  Binary media files go straight to disk — no base64 inflation.
+
+BULK_ALLOWED_EXTS = (
+    ".mp3", ".wav", ".ogg", ".m4a", ".aac",          # audio
+    ".mp4", ".webm", ".mov", ".avi", ".mkv",         # video
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg",  # images
+)
+
+
+def _safe_zip_member(name: str) -> Optional[str]:
+    """Normalise a zip member path; reject traversal / absolute paths."""
+    name = str(name or "").replace("\\", "/")
+    if name.startswith("/") or ".." in [p for p in name.split("/")]:
+        return None
+    parts = [p for p in name.split("/") if p not in ("", ".")]
+    if not parts or len(parts) > 5:
+        return None
+    cleaned = []
+    for p in parts:
+        p = _re.sub(r"[^\w.\-\u0400-\u04FF ]+", "_", p, flags=_re.UNICODE).strip(" .")
+        if not p:
+            return None
+        cleaned.append(p)
+    return "/".join(cleaned)
+
+
+def import_zip_bundle(zip_bytes: bytes, new_id: Optional[str] = None) -> dict:
+    """Import a textbook from a ZIP archive (manifest.json + books + assets).
+
+    Returns the same shape as create_textbook(): {folder, id, title, ...}.
+    """
+    import io
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except (zipfile.BadZipFile, OSError):
+        raise TextbookError("the uploaded file is not a valid ZIP archive")
+
+    with zf:
+        names = zf.namelist()
+        total = sum(i.file_size for i in zf.infolist())
+        if total > MAX_BODY_BYTES:
+            raise TextbookError("unpacked archive is too large (max 512 MB)")
+
+        # locate manifest at the root or under one top-level folder
+        def find_manifest(prefix: str = "") -> Optional[str]:
+            for n in names:
+                rel = n[len(prefix):] if prefix and n.startswith(prefix) else n
+                if rel.lower() in MANIFEST_NAMES:
+                    return n
+            return None
+
+        top = ""
+        mname = find_manifest()
+        if mname is None:
+            roots = {n.split("/")[0] + "/" for n in names if "/" in n}
+            for r in sorted(roots):
+                if find_manifest(r):
+                    top = r
+                    break
+            mname = find_manifest(top)
+        if mname is None:
+            raise TextbookError("manifest.json not found in the archive "
+                                "(see textbooks/_TEMPLATE for the layout)")
+
+        try:
+            manifest = json.loads(zf.read(mname).decode("utf-8"))
+        except Exception as exc:
+            raise TextbookError("manifest.json is not valid JSON: %s" % exc)
+        vm = validate_manifest(manifest)
+        if not vm["ok"]:
+            raise TextbookError("; ".join(vm["errors"]))
+        manifest = vm["value"]
+
+        books: dict = {}
+        errors: list[str] = []
+        for slot in ("student", "workbook"):
+            cand = None
+            for n in names:
+                rel = n[len(top):] if top else n
+                if rel == slot + ".json":
+                    cand = n
+                    break
+            if not cand:
+                continue
+            try:
+                data = json.loads(zf.read(cand).decode("utf-8"))
+            except Exception as exc:
+                errors.append("%s.json: invalid JSON (%s)" % (slot, exc))
+                continue
+            vb = validate_book(data)
+            errors.extend("%s: %s" % (slot, e) for e in vb["errors"])
+            books[slot] = vb["value"]
+        if errors:
+            raise TextbookError("; ".join(errors[:8]))
+        if not books:
+            raise TextbookError("no student.json / workbook.json found in the archive")
+
+        # ---- write everything to disk directly (binary-safe, no base64) ----
+        if new_id:
+            manifest["id"] = slugify(new_id)
+        slug = slugify(manifest["id"] or manifest["title"]) or "textbook"
+        folder = unique_folder(slug, TEXTBOOKS_DIR)
+        name = os.path.basename(folder)
+        manifest["id"] = name
+        manifest.setdefault("source", "imported")
+        os.makedirs(os.path.join(folder, "assets"), exist_ok=True)
+
+        with open(os.path.join(folder, "manifest.json"), "w", encoding="utf-8") as fh:
+            json.dump(manifest, fh, ensure_ascii=False, indent=2)
+        for slot, data in books.items():
+            with open(os.path.join(folder, slot + ".json"), "w", encoding="utf-8") as fh:
+                json.dump(data, fh, ensure_ascii=False, indent=2)
+
+        asset_count = 0
+        skipped: list[str] = []
+        for info in zf.infolist():
+            if info.is_dir():
+                continue
+            rel = info.filename[len(top):] if top else info.filename
+            safe = _safe_zip_member(rel)
+            if not safe:
+                continue
+            low = safe.lower()
+            if low.endswith(".json"):
+                continue  # manifests/books already handled
+            if not low.endswith(BULK_ALLOWED_EXTS):
+                skipped.append(safe)
+                continue
+            dest = _safe_join(folder, "assets", *safe.split("/"))
+            if os.path.dirname(dest):
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+            with zf.open(info) as src, open(dest, "wb") as dst:
+                shutil.copyfileobj(src, dst, 1024 * 256)
+            asset_count += 1
+
+        invalidate_cache()
+        return {
+            "folder": name,
+            "id": name,
+            "title": manifest.get("title", name),
+            "assets_imported": asset_count,
+            "assets_skipped": skipped[:20],
+            "books": list(books.keys()),
+        }
 
 
 # --------------------------------------------------------------------------- #

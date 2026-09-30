@@ -16,6 +16,7 @@ import mimetypes
 import os
 import re
 import sys
+import time
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -276,7 +277,7 @@ class Handler(BaseHTTPRequestHandler):
         if length <= 0:
             return {}
         if length > loader.MAX_BODY_BYTES:
-            raise loader.TextbookError("request body too large (max 64 MB)")
+            raise loader.TextbookError("request body too large (max 512 MB)")
         raw = self.rfile.read(length)
         try:
             data = json.loads(raw.decode("utf-8"))
@@ -286,11 +287,44 @@ class Handler(BaseHTTPRequestHandler):
             raise loader.TextbookError("body must be a JSON object")
         return data
 
+    def _read_raw_body(self) -> bytes:
+        """Read the request body as-is (used by the binary ZIP import)."""
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            raise loader.TextbookError("bad Content-Length")
+        if length <= 0:
+            raise loader.TextbookError("empty upload — choose a .zip textbook archive")
+        if length > loader.MAX_BODY_BYTES:
+            raise loader.TextbookError("upload too large (max 512 MB)")
+        # read in chunks so huge uploads don't stall on one giant recv
+        buf, remaining = bytearray(), length
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 1024 * 512))
+            if not chunk:
+                break
+            buf += chunk
+            remaining -= len(chunk)
+        if len(buf) != length:
+            raise loader.TextbookError("upload was interrupted (%d of %d bytes)" % (len(buf), length))
+        return bytes(buf)
+
     def do_POST(self) -> None:  # noqa: N802
         parsed = urllib.parse.urlparse(self.path)
         path = urllib.parse.unquote(parsed.path)
         parts = [p for p in path.split("/") if p]
         try:
+            # POST /api/import-zip  -> bulk textbook import (binary ZIP body)
+            if parts == ["api", "import-zip"]:
+                raw = self._read_raw_body()
+                qs = urllib.parse.parse_qs(parsed.query or "")
+                new_id = (qs.get("id") or [""])[0] or None
+                t0 = time.time()
+                res = loader.import_zip_bundle(raw, new_id)
+                res["ok"] = True
+                res["seconds"] = round(time.time() - t0, 1)
+                return self._send_json(res)
+
             body = self._read_body()
 
             # POST /api/textbooks                     -> create a new course
