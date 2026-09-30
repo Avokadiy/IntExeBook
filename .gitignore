@@ -1,7 +1,0 @@
-node_modules/
-dist/
-build/
-out/
-__pycache__/
-*.pyc
-*.bundle
