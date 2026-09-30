@@ -1,0 +1,12 @@
+{
+  "id": "solutions-elementary",
+  "title": "Solutions Elementary (3rd edition)",
+  "subtitle": "Student's Book + Workbook",
+  "level": "CEFR A1–A2 (Elementary)",
+  "publisher": "Pearson — converted from SB/WB for IntExeBook",
+  "description": "Interactive versions of Starter + Units 1–9 exercises. Listening tasks carry audio placeholders (assets/*.mp3) — drop the real tracks into textbooks/solutions-elementary/assets/ and they start playing automatically.",
+  "color": "#e11d48",
+  "icon": "🎓",
+  "student": "Student's Book",
+  "workbook": "Workbook"
+}

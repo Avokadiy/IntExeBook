@@ -1,0 +1,764 @@
+{
+  "units": [
+    {
+      "id": "starter",
+      "title": "Starter Unit",
+      "lessons": [
+        {
+          "id": "ws-gram",
+          "title": "Grammar — can",
+          "page": 6,
+          "tasks": [
+            {
+              "id": "ws-t1",
+              "type": "gap-fill",
+              "title": "can / can't",
+              "instruction": "Complete the sentences.",
+              "text": "1. ___ you ride a horse? 2. No, I ___. 3. She ___ speak French very well. 4. We ___ use phones in class — it's forbidden!",
+              "blanks": [
+                {
+                  "answers": [
+                    "Can"
+                  ]
+                },
+                {
+                  "answers": [
+                    "can't",
+                    "cannot"
+                  ]
+                },
+                {
+                  "answers": [
+                    "can"
+                  ]
+                },
+                {
+                  "answers": [
+                    "can't"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u1",
+      "title": "Unit 1 — Family and friends",
+      "lessons": [
+        {
+          "id": "wu1-word",
+          "title": "Word Skills — singular & plural nouns",
+          "page": 10,
+          "tasks": [
+            {
+              "id": "wu1-t1",
+              "type": "gap-fill",
+              "title": "Plural endings",
+              "instruction": "Complete the spelling rules.",
+              "text": "1. To make the plural of most nouns we add ___. 2. If the noun ends in -s, -sh, -ch, -z or -x, we add ___. 3. If it ends in consonant + -y, change -y to ___. 4. If it ends in -f or -fe, we often change it to ___.",
+              "blanks": [
+                {
+                  "answers": [
+                    "s",
+                    "-s"
+                  ]
+                },
+                {
+                  "answers": [
+                    "es",
+                    "-es"
+                  ]
+                },
+                {
+                  "answers": [
+                    "ies",
+                    "-ies"
+                  ]
+                },
+                {
+                  "answers": [
+                    "ves",
+                    "-ves"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "wu1-t2",
+              "type": "multiple-choice",
+              "title": "Irregular plural",
+              "instruction": "The plural of 'knife' is:",
+              "options": [
+                "knifes",
+                "knives",
+                "knivez"
+              ],
+              "answerIndex": 1
+            },
+            {
+              "id": "wu1-t3",
+              "type": "find-and-click",
+              "title": "Uncountable nouns",
+              "instruction": "Click all the uncountable nouns in the sentence.",
+              "text": "We always buy bread, cheese and tomatoes, and drink milk with dinner.",
+              "targets": [
+                "bread",
+                "cheese",
+                "milk"
+              ],
+              "mode": "words"
+            }
+          ]
+        },
+        {
+          "id": "wu1-gram",
+          "title": "Grammar — present simple",
+          "page": 12,
+          "tasks": [
+            {
+              "id": "wu1-t4",
+              "type": "word-order",
+              "title": "Negative sentences",
+              "instruction": "Put the words in order.",
+              "words": [
+                "He",
+                "doesn't",
+                "like",
+                "reality",
+                "TV",
+                "shows"
+              ],
+              "answer": "He doesn't like reality TV shows"
+            },
+            {
+              "id": "wu1-t5",
+              "type": "gap-fill",
+              "title": "Adverbs of frequency",
+              "instruction": "Put the adverb in the correct place.",
+              "text": "1. I am ___ late for school (always). 2. She eats ___ meat (never).",
+              "blanks": [
+                {
+                  "answers": [
+                    "always"
+                  ]
+                },
+                {
+                  "answers": [
+                    "never"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u2",
+      "title": "Unit 2 — School days",
+      "lessons": [
+        {
+          "id": "wu2-vocab",
+          "title": "Vocabulary — school",
+          "page": 16,
+          "tasks": [
+            {
+              "id": "wu2-t1",
+              "type": "choose-odd-one-out",
+              "title": "Classroom objects",
+              "instruction": "Tap the odd ones out.",
+              "options": [
+                {
+                  "text": "ruler",
+                  "isOdd": false
+                },
+                {
+                  "text": "break",
+                  "isOdd": true
+                },
+                {
+                  "text": "rubber",
+                  "isOdd": false
+                },
+                {
+                  "text": "sharpener",
+                  "isOdd": false
+                },
+                {
+                  "text": "PE",
+                  "isOdd": true
+                }
+              ],
+              "categoryHint": "Objects vs. other words"
+            }
+          ]
+        },
+        {
+          "id": "wu2-gram",
+          "title": "Grammar — have to",
+          "page": 18,
+          "tasks": [
+            {
+              "id": "wu2-t2",
+              "type": "gap-fill",
+              "title": "have to",
+              "instruction": "Complete the school rules.",
+              "text": "1. We ___ wear a uniform. 2. Students ___ arrive on time. 3. I ___ do homework every day. 4. She ___ get up early on Sundays (it's not necessary).",
+              "blanks": [
+                {
+                  "answers": [
+                    "have to"
+                  ]
+                },
+                {
+                  "answers": [
+                    "have to"
+                  ]
+                },
+                {
+                  "answers": [
+                    "have to"
+                  ]
+                },
+                {
+                  "answers": [
+                    "doesn't have to",
+                    "does not have to"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u4",
+      "title": "Unit 4 — Food",
+      "lessons": [
+        {
+          "id": "wu4-gram",
+          "title": "Grammar — much / many",
+          "page": 36,
+          "tasks": [
+            {
+              "id": "wu4-t1",
+              "type": "multiple-choice",
+              "title": "How ___ apples?",
+              "instruction": "___ apples do we need for the pie?",
+              "options": [
+                "How much",
+                "How many",
+                "How many of"
+              ],
+              "answerIndex": 1
+            },
+            {
+              "id": "wu4-t2",
+              "type": "gap-fill",
+              "title": "a few / a little",
+              "instruction": "Complete.",
+              "text": "1. There is ___ water in the bottle. 2. We have ___ vegetables left. 3. How ___ sugar do you take in your tea?",
+              "blanks": [
+                {
+                  "answers": [
+                    "a little"
+                  ]
+                },
+                {
+                  "answers": [
+                    "a few"
+                  ]
+                },
+                {
+                  "answers": [
+                    "much"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u5",
+      "title": "Unit 5 — In the city",
+      "lessons": [
+        {
+          "id": "wu5-vocab",
+          "title": "Vocabulary — town",
+          "page": 42,
+          "tasks": [
+            {
+              "id": "wu5-t1",
+              "type": "matching",
+              "title": "Where do you buy it?",
+              "instruction": "Match the thing to the shop.",
+              "pairs": [
+                {
+                  "left": "medicine",
+                  "right": "pharmacy"
+                },
+                {
+                  "left": "bread",
+                  "right": "bakery"
+                },
+                {
+                  "left": "novel",
+                  "right": "bookshop"
+                },
+                {
+                  "left": "steak",
+                  "right": "butcher's"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u6",
+      "title": "Unit 6 — Going wild",
+      "lessons": [
+        {
+          "id": "wu6-read",
+          "title": "Reading — animals",
+          "page": 52,
+          "tasks": [
+            {
+              "id": "wu6-t1",
+              "type": "true-false",
+              "title": "Animal facts",
+              "instruction": "The giant panda lives mainly on bamboo.",
+              "answer": true
+            },
+            {
+              "id": "wu6-t2",
+              "type": "word-search",
+              "title": "Endangered animals",
+              "instruction": "Find four animals.",
+              "words": [
+                "PANDA",
+                "TIGER",
+                "ORANGUTAN",
+                "WHALE"
+              ],
+              "grid": [
+                [
+                  "X",
+                  "P",
+                  "A",
+                  "N",
+                  "D",
+                  "A",
+                  "Y",
+                  "Z"
+                ],
+                [
+                  "T",
+                  "T",
+                  "I",
+                  "G",
+                  "E",
+                  "R",
+                  "W",
+                  "Q"
+                ],
+                [
+                  "O",
+                  "R",
+                  "A",
+                  "N",
+                  "G",
+                  "U",
+                  "T",
+                  "A",
+                  "N",
+                  "R"
+                ],
+                [
+                  "Z",
+                  "W",
+                  "H",
+                  "A",
+                  "L",
+                  "E",
+                  "V",
+                  "K"
+                ]
+              ],
+              "note": "All words are horizontal."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u7",
+      "title": "Unit 7 — Digital world",
+      "lessons": [
+        {
+          "id": "wu7-vocab",
+          "title": "Vocabulary — computing",
+          "page": 68,
+          "tasks": [
+            {
+              "id": "wu7-t1",
+              "type": "word-search",
+              "title": "Computing nouns",
+              "instruction": "Find five computing words from the workbook wordsearch.",
+              "words": [
+                "CAMERA",
+                "DRIVE",
+                "KEYBOARD",
+                "MONITOR",
+                "SCREEN"
+              ],
+              "grid": [
+                [
+                  "C",
+                  "A",
+                  "M",
+                  "E",
+                  "R",
+                  "A",
+                  "X",
+                  "X",
+                  "K",
+                  "L"
+                ],
+                [
+                  "M",
+                  "D",
+                  "R",
+                  "I",
+                  "V",
+                  "E",
+                  "Q",
+                  "Q",
+                  "A",
+                  "Z"
+                ],
+                [
+                  "K",
+                  "E",
+                  "Y",
+                  "B",
+                  "O",
+                  "A",
+                  "R",
+                  "D",
+                  "W",
+                  "W"
+                ],
+                [
+                  "Z",
+                  "M",
+                  "O",
+                  "N",
+                  "I",
+                  "T",
+                  "O",
+                  "R",
+                  "P",
+                  "L"
+                ],
+                [
+                  "S",
+                  "S",
+                  "C",
+                  "R",
+                  "E",
+                  "E",
+                  "N",
+                  "H",
+                  "J"
+                ]
+              ],
+              "note": "All words are horizontal."
+            },
+            {
+              "id": "wu7-t2",
+              "type": "word-order",
+              "title": "Present continuous sentences",
+              "instruction": "Put the words in order.",
+              "words": [
+                "They",
+                "are",
+                "scanning",
+                "an",
+                "important",
+                "document"
+              ],
+              "answer": "They are scanning an important document"
+            },
+            {
+              "id": "wu7-t3",
+              "type": "gap-fill",
+              "title": "Present continuous",
+              "instruction": "Complete the sentences.",
+              "text": "1. He ___ (upload) some photos now. 2. She ___ (post) a comment on Facebook. 3. I ___ (not / delete) my files. 4. ___ you ___ (surf) the Web?",
+              "blanks": [
+                {
+                  "answers": [
+                    "is uploading"
+                  ]
+                },
+                {
+                  "answers": [
+                    "is posting"
+                  ]
+                },
+                {
+                  "answers": [
+                    "am not deleting"
+                  ]
+                },
+                {
+                  "answers": [
+                    "Are"
+                  ],
+                  "hint": "auxiliary"
+                },
+                {
+                  "answers": [
+                    "surfing"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "wu7-t4",
+              "type": "multiple-choice",
+              "title": "Listening cloze",
+              "instruction": "'You just need to ___ the link.' Choose the correct verb. [Audio to be added manually] 🎧",
+              "options": [
+                "click",
+                "delete",
+                "print"
+              ],
+              "answerIndex": 0,
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "assets/wb-u7-track.mp3",
+                  "caption": "Workbook Unit 7 · dialogues"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "wu7-gram",
+          "title": "Grammar — past simple irregular",
+          "page": 70,
+          "tasks": [
+            {
+              "id": "wu7-t5",
+              "type": "gap-fill",
+              "title": "Sam Kodo text",
+              "instruction": "Complete with the past simple of the verbs in brackets.",
+              "text": "Sam Kodo from Togo ___ (become) an inventor when he was young. When he ___ (be) seven, he ___ (build) his own robot. The robot ___ (can) move around a room. Sam often ___ (go) with his father to work and ___ (read) books in the library. His favourite books ___ (be) about electronics. He ___ (begin) to make things from broken TVs.",
+              "blanks": [
+                {
+                  "answers": [
+                    "became"
+                  ]
+                },
+                {
+                  "answers": [
+                    "was"
+                  ]
+                },
+                {
+                  "answers": [
+                    "built"
+                  ]
+                },
+                {
+                  "answers": [
+                    "could"
+                  ]
+                },
+                {
+                  "answers": [
+                    "went"
+                  ]
+                },
+                {
+                  "answers": [
+                    "read"
+                  ]
+                },
+                {
+                  "answers": [
+                    "were"
+                  ]
+                },
+                {
+                  "answers": [
+                    "began"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "wu7-t6",
+              "type": "find-and-click",
+              "title": "Incorrect past forms",
+              "instruction": "Click every INCORRECT past simple form.",
+              "text": "I taked a lot of photos. We speaked to the teacher. You comed home late. My grandfather fighted in the war. I had cereal.",
+              "targets": [
+                "taked",
+                "speaked",
+                "comed",
+                "fighted"
+              ],
+              "mode": "words"
+            },
+            {
+              "id": "wu7-t7",
+              "type": "matching",
+              "title": "Irregular verbs chart",
+              "instruction": "Match the verb to its past simple.",
+              "pairs": [
+                {
+                  "left": "draw",
+                  "right": "drew"
+                },
+                {
+                  "left": "fall",
+                  "right": "fell"
+                },
+                {
+                  "left": "find",
+                  "right": "found"
+                },
+                {
+                  "left": "see",
+                  "right": "saw"
+                },
+                {
+                  "left": "think",
+                  "right": "thought"
+                },
+                {
+                  "left": "buy",
+                  "right": "bought"
+                },
+                {
+                  "left": "catch",
+                  "right": "caught"
+                },
+                {
+                  "left": "dream",
+                  "right": "dreamt"
+                }
+              ]
+            },
+            {
+              "id": "wu7-t8",
+              "type": "word-order",
+              "title": "Make a sentence",
+              "instruction": "Put the words in order.",
+              "words": [
+                "We",
+                "saw",
+                "an",
+                "interesting",
+                "film",
+                "last",
+                "night"
+              ],
+              "answer": "We saw an interesting film last night"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u8",
+      "title": "Unit 8 — Be active",
+      "lessons": [
+        {
+          "id": "wu8-gram",
+          "title": "Grammar — past simple",
+          "page": 80,
+          "tasks": [
+            {
+              "id": "wu8-t1",
+              "type": "gap-fill",
+              "title": "Regular or irregular?",
+              "instruction": "Complete with the past simple.",
+              "text": "1. I ___ (travel) around Japan last summer. 2. My brother ___ (bring) home a cat. 3. The lesson ___ (finish) an hour ago. 4. My parents ___ (teach) abroad ten years ago.",
+              "blanks": [
+                {
+                  "answers": [
+                    "travelled",
+                    "traveled"
+                  ]
+                },
+                {
+                  "answers": [
+                    "brought"
+                  ]
+                },
+                {
+                  "answers": [
+                    "finished"
+                  ]
+                },
+                {
+                  "answers": [
+                    "taught"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u9",
+      "title": "Unit 9 — Home sweet home",
+      "lessons": [
+        {
+          "id": "wu9-vocab",
+          "title": "Vocabulary — home",
+          "page": 90,
+          "tasks": [
+            {
+              "id": "wu9-t1",
+              "type": "matching",
+              "title": "Parts of a house",
+              "instruction": "Match the word to its description.",
+              "pairs": [
+                {
+                  "left": "ceiling",
+                  "right": "at the top of a room"
+                },
+                {
+                  "left": "floor",
+                  "right": "you walk on it"
+                },
+                {
+                  "left": "gate",
+                  "right": "at the edge of a garden"
+                },
+                {
+                  "left": "chimney",
+                  "right": "smoke goes out of it"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

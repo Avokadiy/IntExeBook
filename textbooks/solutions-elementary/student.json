@@ -1,0 +1,1555 @@
+{
+  "units": [
+    {
+      "id": "starter",
+      "title": "Starter Unit",
+      "lessons": [
+        {
+          "id": "st-vocab",
+          "title": "Vocabulary — musical instruments & action verbs",
+          "page": 6,
+          "tasks": [
+            {
+              "id": "st-t1",
+              "type": "multiple-choice",
+              "title": "Missing instrument",
+              "instruction": "Complete the list of musical instruments: clarinet, drums, flute, guitar, keyboard, piano, saxophone, trumpet, ___",
+              "options": [
+                "violin",
+                "piano bench",
+                "amplifier",
+                "drumstick"
+              ],
+              "answerIndex": 0
+            },
+            {
+              "id": "st-t2",
+              "type": "choose-odd-one-out",
+              "title": "Odd one out — action verbs",
+              "instruction": "Tap all words that are NOT action verbs from the unit.",
+              "options": [
+                {
+                  "text": "dance",
+                  "isOdd": false
+                },
+                {
+                  "text": "skate",
+                  "isOdd": false
+                },
+                {
+                  "text": "guitar",
+                  "isOdd": true
+                },
+                {
+                  "text": "sing",
+                  "isOdd": false
+                },
+                {
+                  "text": "ski",
+                  "isOdd": false
+                },
+                {
+                  "text": "football pitch",
+                  "isOdd": true
+                }
+              ],
+              "categoryHint": "Action verbs: dance, skate, sing, ski…"
+            },
+            {
+              "id": "st-t3",
+              "type": "find-and-click",
+              "title": "can / can't",
+              "instruction": "Click every word 'can' (including can't) in the dialogue extract.",
+              "text": "She can play the guitar really well. But she can't sing. Can you play the piano like that? No, I can't. But I can play the piano.",
+              "targets": [
+                "can",
+                "can't"
+              ],
+              "mode": "words"
+            }
+          ]
+        },
+        {
+          "id": "st-grammar",
+          "title": "Grammar — can: ability & permission",
+          "page": 8,
+          "tasks": [
+            {
+              "id": "st-t4",
+              "type": "gap-fill",
+              "title": "Ask for permission",
+              "instruction": "Complete with CAN or CAN'T.",
+              "text": "1. ___ I borrow your pencil, please? 2. No, you ___. 3. She ___ play the drums — she's great! 4. He ___ find his money. 5. ___ I use your dictionary?",
+              "blanks": [
+                {
+                  "answers": [
+                    "can"
+                  ]
+                },
+                {
+                  "answers": [
+                    "can't",
+                    "cannot"
+                  ]
+                },
+                {
+                  "answers": [
+                    "can"
+                  ]
+                },
+                {
+                  "answers": [
+                    "can't"
+                  ]
+                },
+                {
+                  "answers": [
+                    "can"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "st-t5",
+              "type": "word-order",
+              "title": "Word order",
+              "instruction": "Put the words in order to make a sentence.",
+              "words": [
+                "Can",
+                "I",
+                "your",
+                "book",
+                "share",
+                "?"
+              ],
+              "answer": "Can I share your book?"
+            },
+            {
+              "id": "st-t6",
+              "type": "true-false",
+              "title": "Grammar rule",
+              "instruction": "The form of 'can' is different for each person (I can, he cans …).",
+              "answer": false
+            }
+          ]
+        },
+        {
+          "id": "st-listen",
+          "title": "Listening — identify the instruments",
+          "page": 7,
+          "tasks": [
+            {
+              "id": "st-t7",
+              "type": "multiple-choice",
+              "title": "Which instrument? (1)",
+              "instruction": "Listen and choose the instrument you hear. [Audio to be added manually] 🎧",
+              "options": [
+                "clarinet",
+                "drums",
+                "flute",
+                "trumpet"
+              ],
+              "answerIndex": 0,
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "assets/starter-track-1.mp3",
+                  "caption": "Starter · track 1"
+                }
+              ]
+            },
+            {
+              "id": "st-t8",
+              "type": "multiple-choice",
+              "title": "Which instrument? (2)",
+              "instruction": "Listen and choose the instrument you hear. [Audio to be added manually] 🎧",
+              "options": [
+                "piano",
+                "saxophone",
+                "violin",
+                "keyboard"
+              ],
+              "answerIndex": 2,
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "assets/starter-track-2.mp3",
+                  "caption": "Starter · track 2"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u1",
+      "title": "Unit 1 — Family and friends",
+      "lessons": [
+        {
+          "id": "u1-clans",
+          "title": "Vocabulary — family & adjectives + prepositions",
+          "page": 16,
+          "tasks": [
+            {
+              "id": "u1-t1",
+              "type": "matching",
+              "title": "Family adjectives",
+              "instruction": "Match the adjective to its meaning.",
+              "pairs": [
+                {
+                  "left": "get on well with",
+                  "right": "have a good relationship"
+                },
+                {
+                  "left": "argue",
+                  "right": "say angry words to each other"
+                },
+                {
+                  "left": "similar to",
+                  "right": "almost the same as"
+                },
+                {
+                  "left": "keen on",
+                  "right": "very interested in"
+                }
+              ]
+            },
+            {
+              "id": "u1-t2",
+              "type": "gap-fill",
+              "title": "Adjectives + prepositions",
+              "instruction": "Complete the sentences with the correct preposition.",
+              "text": "1. Are you interested___ the same things? 2. Is your brother good___ maths? 3. Are you keen___ football? 4. We are similar___ each other. 5. She is frightened___ spiders.",
+              "blanks": [
+                {
+                  "answers": [
+                    "in"
+                  ],
+                  "hint": "interested ___"
+                },
+                {
+                  "answers": [
+                    "at"
+                  ],
+                  "hint": "good ___"
+                },
+                {
+                  "answers": [
+                    "on"
+                  ],
+                  "hint": "keen ___"
+                },
+                {
+                  "answers": [
+                    "to"
+                  ],
+                  "hint": "similar ___"
+                },
+                {
+                  "answers": [
+                    "of"
+                  ],
+                  "hint": "frightened ___"
+                }
+              ]
+            },
+            {
+              "id": "u1-t3",
+              "type": "translate-match",
+              "title": "Learn this! — prepositions",
+              "instruction": "Match the adjective to the preposition it takes.",
+              "pairs": [
+                {
+                  "left": "excited",
+                  "right": "about"
+                },
+                {
+                  "left": "famous",
+                  "right": "for"
+                },
+                {
+                  "left": "frightened",
+                  "right": "of"
+                },
+                {
+                  "left": "good",
+                  "right": "at"
+                },
+                {
+                  "left": "pleased",
+                  "right": "with"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "u1-gram",
+          "title": "Grammar — present simple",
+          "page": 12,
+          "tasks": [
+            {
+              "id": "u1-t4",
+              "type": "multiple-choice",
+              "title": "Present simple — 3rd person",
+              "instruction": "My sister ___ a lot with her friends.",
+              "options": [
+                "argue",
+                "argues",
+                "arguing",
+                "is argue"
+              ],
+              "answerIndex": 1
+            },
+            {
+              "id": "u1-t5",
+              "type": "word-order",
+              "title": "Questions",
+              "instruction": "Put the words in order.",
+              "words": [
+                "How",
+                "do",
+                "often",
+                "you",
+                "see",
+                "your",
+                "cousins",
+                "?"
+              ],
+              "answer": "How often do you see your cousins?"
+            },
+            {
+              "id": "u1-t6",
+              "type": "find-and-click",
+              "title": "Find the negatives",
+              "instruction": "Click every negative verb form in the text.",
+              "text": "I don't argue much with my brother. She doesn't like sharing her room. We don't watch the same programmes, but we get on well.",
+              "targets": [
+                "don't",
+                "doesn't"
+              ],
+              "mode": "words"
+            }
+          ]
+        },
+        {
+          "id": "u1-read",
+          "title": "Reading — Sibling rivalry",
+          "page": 14,
+          "tasks": [
+            {
+              "id": "u1-t7",
+              "type": "multiple-choice",
+              "title": "Best summary",
+              "instruction": "Choose the best summary of the text about brothers and sisters.",
+              "options": [
+                "A lot of teenagers don't get on well with their siblings, but the relationship is usually good when they are adults.",
+                "Some teenagers get on well with siblings and stay that way forever.",
+                "Teenagers never argue with their brothers and sisters."
+              ],
+              "answerIndex": 0
+            },
+            {
+              "id": "u1-t8",
+              "type": "true-false",
+              "title": "Reading statements",
+              "instruction": "According to the website, people usually stop arguing at around the age of 25.",
+              "answer": true
+            },
+            {
+              "id": "u1-t9",
+              "type": "gap-fill",
+              "title": "Give advice",
+              "instruction": "Complete the advice sentence from the text.",
+              "text": "Give your brother or sister some ___ alone when they need it.",
+              "blanks": [
+                {
+                  "answers": [
+                    "time",
+                    "space"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u2",
+      "title": "Unit 2 — School days",
+      "lessons": [
+        {
+          "id": "u2-vocab",
+          "title": "Vocabulary — school subjects & rules",
+          "page": 20,
+          "tasks": [
+            {
+              "id": "u2-t1",
+              "type": "choose-odd-one-out",
+              "title": "School subjects",
+              "instruction": "Tap all words that are NOT school subjects.",
+              "options": [
+                {
+                  "text": "geography",
+                  "isOdd": false
+                },
+                {
+                  "text": "rucksack",
+                  "isOdd": true
+                },
+                {
+                  "text": "history",
+                  "isOdd": false
+                },
+                {
+                  "text": "drama",
+                  "isOdd": false
+                },
+                {
+                  "text": "canteen",
+                  "isOdd": true
+                },
+                {
+                  "text": "science",
+                  "isOdd": false
+                }
+              ],
+              "categoryHint": "Subjects vs. school objects/places"
+            },
+            {
+              "id": "u2-t2",
+              "type": "matching",
+              "title": "School collocations",
+              "instruction": "Match the halves of the phrases.",
+              "pairs": [
+                {
+                  "left": "do",
+                  "right": "homework"
+                },
+                {
+                  "left": "hand",
+                  "right": "in your essay"
+                },
+                {
+                  "left": "pay",
+                  "right": "attention"
+                },
+                {
+                  "left": "sit",
+                  "right": "an exam"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "u2-gram",
+          "title": "Grammar — have to",
+          "page": 22,
+          "tasks": [
+            {
+              "id": "u2-t3",
+              "type": "gap-fill",
+              "title": "have to / don't have to",
+              "instruction": "Complete with HAVE TO or DON'T HAVE TO.",
+              "text": "1. At the BRIT School students ___ attend all the lessons. 2. You ___ wear a uniform here — it's optional. 3. We ___ be on time. 4. She ___ study on Saturdays.",
+              "blanks": [
+                {
+                  "answers": [
+                    "have to"
+                  ]
+                },
+                {
+                  "answers": [
+                    "don't have to",
+                    "do not have to"
+                  ]
+                },
+                {
+                  "answers": [
+                    "have to"
+                  ]
+                },
+                {
+                  "answers": [
+                    "doesn't have to",
+                    "does not have to"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "u2-t4",
+              "type": "word-order",
+              "title": "Rules",
+              "instruction": "Put the words in order.",
+              "words": [
+                "We",
+                "must",
+                "hand",
+                "in",
+                "homework",
+                "on",
+                "Friday"
+              ],
+              "answer": "We must hand in homework on Friday"
+            }
+          ]
+        },
+        {
+          "id": "u2-exam",
+          "title": "Exam Skills — Reading",
+          "page": 28,
+          "tasks": [
+            {
+              "id": "u2-t5",
+              "type": "true-false",
+              "title": "Reading strategy",
+              "instruction": "When checking if a sentence fits a gap, you only need to read the sentence itself.",
+              "answer": false
+            },
+            {
+              "id": "u2-t6",
+              "type": "translate-match",
+              "title": "Gap-fit check questions",
+              "instruction": "Match the question to what it checks.",
+              "pairs": [
+                {
+                  "left": "Does it make sense?",
+                  "right": "meaning"
+                },
+                {
+                  "left": "Does it fit grammatically?",
+                  "right": "tense, pronouns, singular/plural"
+                },
+                {
+                  "left": "Does it match the topic?",
+                  "right": "the paragraph subject"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u3",
+      "title": "Unit 3 — Style",
+      "lessons": [
+        {
+          "id": "u3-vocab",
+          "title": "Vocabulary — clothes & fashion",
+          "page": 32,
+          "tasks": [
+            {
+              "id": "u3-t1",
+              "type": "find-and-click",
+              "title": "Fabric words",
+              "instruction": "Click all materials in the sentence.",
+              "text": "This jacket is made of leather, with a cotton lining and wool trim.",
+              "targets": [
+                "leather",
+                "cotton",
+                "wool"
+              ],
+              "mode": "words"
+            },
+            {
+              "id": "u3-t2",
+              "type": "multiple-choice",
+              "title": "Style check",
+              "instruction": "A person who dresses carefully and stylishly is well ___.",
+              "options": [
+                "dressed",
+                "worn",
+                "put",
+                "made"
+              ],
+              "answerIndex": 0
+            }
+          ]
+        },
+        {
+          "id": "u3-gram",
+          "title": "Grammar — present continuous",
+          "page": 34,
+          "tasks": [
+            {
+              "id": "u3-t3",
+              "type": "gap-fill",
+              "title": "What's happening now?",
+              "instruction": "Put the verbs in the Present Continuous.",
+              "text": "1. She ___ (wear) a denim jacket today. 2. They ___ (not / follow) the trends. 3. ___ he ___ (try) on those trainers?",
+              "blanks": [
+                {
+                  "answers": [
+                    "is wearing"
+                  ]
+                },
+                {
+                  "answers": [
+                    "aren't following",
+                    "are not following"
+                  ]
+                },
+                {
+                  "answers": [
+                    "is"
+                  ],
+                  "hint": "auxiliary"
+                },
+                {
+                  "answers": [
+                    "trying"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "u3-t4",
+              "type": "true-false",
+              "title": "Use of the tense",
+              "instruction": "We use the present continuous to talk about future arrangements.",
+              "answer": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u4",
+      "title": "Unit 4 — Food",
+      "lessons": [
+        {
+          "id": "u4-vocab",
+          "title": "Vocabulary — food & cooking",
+          "page": 40,
+          "tasks": [
+            {
+              "id": "u4-t1",
+              "type": "word-search",
+              "title": "Kitchen words",
+              "instruction": "Find six hidden food words.",
+              "words": [
+                "BREAD",
+                "CHEESE",
+                "CHICKEN",
+                "NOODLES",
+                "PEPPER",
+                "SALMON"
+              ],
+              "grid": [
+                [
+                  "B",
+                  "R",
+                  "E",
+                  "A",
+                  "D",
+                  "T",
+                  "X"
+                ],
+                [
+                  "C",
+                  "H",
+                  "E",
+                  "E",
+                  "S",
+                  "E",
+                  "S",
+                  "Q"
+                ],
+                [
+                  "M",
+                  "N",
+                  "O",
+                  "O",
+                  "D",
+                  "L",
+                  "E",
+                  "S",
+                  "K"
+                ],
+                [
+                  "P",
+                  "C",
+                  "H",
+                  "I",
+                  "C",
+                  "K",
+                  "E",
+                  "N",
+                  "L"
+                ],
+                [
+                  "P",
+                  "E",
+                  "P",
+                  "P",
+                  "E",
+                  "R",
+                  "T",
+                  "O",
+                  "W"
+                ],
+                [
+                  "X",
+                  "S",
+                  "A",
+                  "L",
+                  "M",
+                  "O",
+                  "N",
+                  "Y"
+                ]
+              ],
+              "note": "All words are horizontal."
+            },
+            {
+              "id": "u4-t2",
+              "type": "choose-odd-one-out",
+              "title": "Meals",
+              "instruction": "Tap the odd ones out.",
+              "options": [
+                {
+                  "text": "breakfast",
+                  "isOdd": false
+                },
+                {
+                  "text": "fridge",
+                  "isOdd": true
+                },
+                {
+                  "text": "lunch",
+                  "isOdd": false
+                },
+                {
+                  "text": "dinner",
+                  "isOdd": false
+                },
+                {
+                  "text": "pan",
+                  "isOdd": true
+                }
+              ],
+              "categoryHint": "Meals vs. kitchen things"
+            }
+          ]
+        },
+        {
+          "id": "u4-gram",
+          "title": "Grammar — how much / how many",
+          "page": 44,
+          "tasks": [
+            {
+              "id": "u4-t3",
+              "type": "gap-fill",
+              "title": "much / many / a few / a little",
+              "instruction": "Complete the sentences.",
+              "text": "1. How ___ sugar do we need? 2. There aren't ___ eggs left. 3. Add a ___ milk to the sauce. 4. We have a ___ tomatoes in the fridge.",
+              "blanks": [
+                {
+                  "answers": [
+                    "much"
+                  ]
+                },
+                {
+                  "answers": [
+                    "many"
+                  ]
+                },
+                {
+                  "answers": [
+                    "little"
+                  ],
+                  "hint": "a ___ (uncountable)"
+                },
+                {
+                  "answers": [
+                    "few"
+                  ],
+                  "hint": "a ___ (countable)"
+                }
+              ]
+            },
+            {
+              "id": "u4-t4",
+              "type": "multiple-choice",
+              "title": "Countable or not?",
+              "instruction": "Which noun is uncountable?",
+              "options": [
+                "rice",
+                "apple",
+                "egg",
+                "carrot"
+              ],
+              "answerIndex": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u5",
+      "title": "Unit 5 — In the city",
+      "lessons": [
+        {
+          "id": "u5-vocab",
+          "title": "Vocabulary — places in town",
+          "page": 52,
+          "tasks": [
+            {
+              "id": "u5-t1",
+              "type": "matching",
+              "title": "Places & definitions",
+              "instruction": "Match the place to its definition.",
+              "pairs": [
+                {
+                  "left": "library",
+                  "right": "You can borrow books here"
+                },
+                {
+                  "left": "museum",
+                  "right": "You can see old and interesting objects"
+                },
+                {
+                  "left": "pharmacy",
+                  "right": "You can buy medicine here"
+                },
+                {
+                  "left": "town hall",
+                  "right": "The city government works here"
+                }
+              ]
+            },
+            {
+              "id": "u5-t2",
+              "type": "find-and-click",
+              "title": "Direction verbs",
+              "instruction": "Click all direction verbs in the sentence.",
+              "text": "Go along the street, turn left at the bank, then cross the bridge and continue past the hospital.",
+              "targets": [
+                "Go",
+                "turn",
+                "cross",
+                "continue"
+              ],
+              "mode": "words"
+            }
+          ]
+        },
+        {
+          "id": "u5-speaking",
+          "title": "Speaking — asking for directions",
+          "page": 60,
+          "tasks": [
+            {
+              "id": "u5-t4",
+              "type": "gap-fill",
+              "title": "Giving directions",
+              "instruction": "Complete the dialogue.",
+              "text": "A: Excuse me, is there a bank ___? B: Yes, it's ___ the supermarket and the chemist. A: How ___ is it? B: About ten minutes on foot.",
+              "blanks": [
+                {
+                  "answers": [
+                    "nearby",
+                    "near here"
+                  ]
+                },
+                {
+                  "answers": [
+                    "between"
+                  ]
+                },
+                {
+                  "answers": [
+                    "far"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u6",
+      "title": "Unit 6 — Going wild",
+      "lessons": [
+        {
+          "id": "u6-vocab",
+          "title": "Vocabulary — animals & nature",
+          "page": 64,
+          "tasks": [
+            {
+              "id": "u6-t1",
+              "type": "choose-odd-one-out",
+              "title": "Wild animals",
+              "instruction": "Tap all animals that are NOT wild.",
+              "options": [
+                {
+                  "text": "wolf",
+                  "isOdd": false
+                },
+                {
+                  "text": "hamster",
+                  "isOdd": true
+                },
+                {
+                  "text": "eagle",
+                  "isOdd": false
+                },
+                {
+                  "text": "goldfish",
+                  "isOdd": true
+                },
+                {
+                  "text": "snake",
+                  "isOdd": false
+                }
+              ],
+              "categoryHint": "Wild vs. pets"
+            },
+            {
+              "id": "u6-t2",
+              "type": "multiple-choice",
+              "title": "Strange creatures",
+              "instruction": "An animal people thought didn't exist but later found was considered ___.",
+              "options": [
+                "extinct",
+                "mythical",
+                "robotic",
+                "domestic"
+              ],
+              "answerIndex": 1
+            }
+          ]
+        },
+        {
+          "id": "u6-reading",
+          "title": "Reading — Stranger than fiction?",
+          "page": 68,
+          "tasks": [
+            {
+              "id": "u6-t3",
+              "type": "true-false",
+              "title": "Comprehension",
+              "instruction": "The text says scientists discovered some 'imaginary' animals were real.",
+              "answer": true
+            },
+            {
+              "id": "u6-t4",
+              "type": "gap-fill",
+              "title": "Report the fact",
+              "instruction": "Complete the sentence from the reading.",
+              "text": "For years, people believed the animal was just a ___, but it turned out to be ___.",
+              "blanks": [
+                {
+                  "answers": [
+                    "myth",
+                    "legend",
+                    "story"
+                  ]
+                },
+                {
+                  "answers": [
+                    "real"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u7",
+      "title": "Unit 7 — Digital world",
+      "lessons": [
+        {
+          "id": "u7-vocab",
+          "title": "Vocabulary — computing",
+          "page": 74,
+          "tasks": [
+            {
+              "id": "u7-t1",
+              "type": "find-and-click",
+              "title": "Computing verbs",
+              "instruction": "Click all computing verbs in the instructions.",
+              "text": "Connect to Wi-Fi, download the app, enter your password, scan the document, then upload your photo and post a comment.",
+              "targets": [
+                "Connect",
+                "download",
+                "enter",
+                "scan",
+                "upload",
+                "post"
+              ],
+              "mode": "words"
+            },
+            {
+              "id": "u7-t2",
+              "type": "matching",
+              "title": "Gadget collocations",
+              "instruction": "Match verb to noun.",
+              "pairs": [
+                {
+                  "left": "click",
+                  "right": "on a button"
+                },
+                {
+                  "left": "press",
+                  "right": "return"
+                },
+                {
+                  "left": "get",
+                  "right": "an error message"
+                },
+                {
+                  "left": "check",
+                  "right": "your emails"
+                }
+              ]
+            },
+            {
+              "id": "u7-t3",
+              "type": "multiple-choice",
+              "title": "Quiz — HTML",
+              "instruction": "The computer language for a lot of pages on the internet is:",
+              "options": [
+                "HTTP",
+                "HDMI",
+                "HTML"
+              ],
+              "answerIndex": 2
+            },
+            {
+              "id": "u7-t4",
+              "type": "multiple-choice",
+              "title": "Quiz — GB",
+              "instruction": "A laptop has a 16GB hard drive. What does 'GB' stand for?",
+              "options": [
+                "gigaband",
+                "gigabyte",
+                "gigabar"
+              ],
+              "answerIndex": 1
+            },
+            {
+              "id": "u7-t5",
+              "type": "multiple-choice",
+              "title": "Quiz — cookies",
+              "instruction": "When you surf the Web, what do 'cookies' do?",
+              "options": [
+                "Protect your computer from viruses.",
+                "Make the page the right size for your phone.",
+                "Share information about your visit with the website."
+              ],
+              "answerIndex": 2
+            }
+          ]
+        },
+        {
+          "id": "u7-grammar",
+          "title": "Grammar — past simple (irregular)",
+          "page": 76,
+          "tasks": [
+            {
+              "id": "u7-t6",
+              "type": "gap-fill",
+              "title": "Irregular past simple",
+              "instruction": "Complete with the past simple of the verbs in brackets.",
+              "text": "1. I ___ (do) all my homework yesterday. 2. My sister ___ (go) to Paris for the weekend. 3. We ___ (buy) a new car last month. 4. She ___ (take) my homework to school, but now I can't find it. 5. We ___ (catch) the train at six o'clock.",
+              "blanks": [
+                {
+                  "answers": [
+                    "did"
+                  ]
+                },
+                {
+                  "answers": [
+                    "went"
+                  ]
+                },
+                {
+                  "answers": [
+                    "bought"
+                  ]
+                },
+                {
+                  "answers": [
+                    "took"
+                  ]
+                },
+                {
+                  "answers": [
+                    "caught"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "u7-t7",
+              "type": "matching",
+              "title": "Verb → past form",
+              "instruction": "Match the infinitive to its irregular past form.",
+              "pairs": [
+                {
+                  "left": "become",
+                  "right": "became"
+                },
+                {
+                  "left": "begin",
+                  "right": "began"
+                },
+                {
+                  "left": "break",
+                  "right": "broke"
+                },
+                {
+                  "left": "bring",
+                  "right": "brought"
+                },
+                {
+                  "left": "fight",
+                  "right": "fought"
+                },
+                {
+                  "left": "teach",
+                  "right": "taught"
+                },
+                {
+                  "left": "think",
+                  "right": "thought"
+                },
+                {
+                  "left": "read",
+                  "right": "read"
+                }
+              ]
+            },
+            {
+              "id": "u7-t8",
+              "type": "find-and-click",
+              "title": "Find the mistakes",
+              "instruction": "Click every INCORRECT past form in the sentences.",
+              "text": "I taked a lot of photos yesterday. I did my homework this morning. We speaked to the teacher earlier. I had cereal for breakfast. You comed home late. My grandfather fighted in World War 2.",
+              "targets": [
+                "taked",
+                "speaked",
+                "comed",
+                "fighted"
+              ],
+              "mode": "words"
+            },
+            {
+              "id": "u7-t9",
+              "type": "word-order",
+              "title": "Word order",
+              "instruction": "Put the words in order.",
+              "words": [
+                "George",
+                "built",
+                "himself",
+                "an",
+                "aeroplane"
+              ],
+              "answer": "George built himself an aeroplane"
+            },
+            {
+              "id": "u7-t10",
+              "type": "translate-match",
+              "title": "Look out! -ought / -aught",
+              "instruction": "Match the verb to its past form ending in -ought/-aught.",
+              "pairs": [
+                {
+                  "left": "bring",
+                  "right": "brought"
+                },
+                {
+                  "left": "buy",
+                  "right": "bought"
+                },
+                {
+                  "left": "teach",
+                  "right": "taught"
+                },
+                {
+                  "left": "think",
+                  "right": "thought"
+                },
+                {
+                  "left": "catch",
+                  "right": "caught"
+                },
+                {
+                  "left": "fight",
+                  "right": "fought"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "u7-reading",
+          "title": "Reading — Make your dreams a reality",
+          "page": 76,
+          "tasks": [
+            {
+              "id": "u7-t11",
+              "type": "multiple-choice",
+              "title": "George Mel — why did he leave school?",
+              "instruction": "Why did George have to give up school?",
+              "options": [
+                "He moved to another country.",
+                "His family had no money.",
+                "He failed his exams."
+              ],
+              "answerIndex": 1
+            },
+            {
+              "id": "u7-t12",
+              "type": "true-false",
+              "title": "George Mel",
+              "instruction": "A company saw George's video and offered him a job.",
+              "answer": true
+            },
+            {
+              "id": "u7-t13",
+              "type": "gap-fill",
+              "title": "Max's email",
+              "instruction": "Complete the email with the past simple forms.",
+              "text": "Hi Milly! My weekend ___ (be) great. On Friday I ___ (do) all my homework, so I ___ (can) relax. On Saturday a friend ___ (come) to see me and ___ (bring) a few DVDs, so we ___ (stay) at home and ___ (watch) them.",
+              "blanks": [
+                {
+                  "answers": [
+                    "was"
+                  ]
+                },
+                {
+                  "answers": [
+                    "did"
+                  ]
+                },
+                {
+                  "answers": [
+                    "could"
+                  ]
+                },
+                {
+                  "answers": [
+                    "came"
+                  ]
+                },
+                {
+                  "answers": [
+                    "brought"
+                  ]
+                },
+                {
+                  "answers": [
+                    "stayed"
+                  ]
+                },
+                {
+                  "answers": [
+                    "watched"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "u7-listening",
+          "title": "Listening — conversations",
+          "page": 77,
+          "tasks": [
+            {
+              "id": "u7-t14",
+              "type": "multiple-choice",
+              "title": "Listening — tablet quiz",
+              "instruction": "Listen to the conversation. What is the boy doing? [Audio to be added manually] 🎧",
+              "options": [
+                "connecting his tablet to Wi-Fi",
+                "deleting contacts",
+                "printing a document"
+              ],
+              "answerIndex": 0,
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "assets/u7-track-1.mp3",
+                  "caption": "Unit 7 · listening"
+                }
+              ]
+            },
+            {
+              "id": "u7-t15",
+              "type": "translate-match",
+              "title": "Key phrases",
+              "instruction": "Match the halves of the useful phrases.",
+              "pairs": [
+                {
+                  "left": "get",
+                  "right": "your emails"
+                },
+                {
+                  "left": "click",
+                  "right": "on a button"
+                },
+                {
+                  "left": "press",
+                  "right": "return"
+                },
+                {
+                  "left": "visit",
+                  "right": "a web page"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u8",
+      "title": "Unit 8 — Be active",
+      "lessons": [
+        {
+          "id": "u8-vocab",
+          "title": "Vocabulary — sports & free time",
+          "page": 82,
+          "tasks": [
+            {
+              "id": "u8-t1",
+              "type": "choose-odd-one-out",
+              "title": "Sports verbs",
+              "instruction": "Tap the phrases that do NOT go with 'play'.",
+              "options": [
+                {
+                  "text": "play football",
+                  "isOdd": false
+                },
+                {
+                  "text": "play chess",
+                  "isOdd": false
+                },
+                {
+                  "text": "play the bike",
+                  "isOdd": true
+                },
+                {
+                  "text": "play tennis",
+                  "isOdd": false
+                },
+                {
+                  "text": "play skateboarding",
+                  "isOdd": true
+                }
+              ],
+              "categoryHint": "play + ball games / games"
+            },
+            {
+              "id": "u8-t2",
+              "type": "matching",
+              "title": "Do / go / play",
+              "instruction": "Match the activity to its verb.",
+              "pairs": [
+                {
+                  "left": "yoga",
+                  "right": "do"
+                },
+                {
+                  "left": "swimming",
+                  "right": "go"
+                },
+                {
+                  "left": "volleyball",
+                  "right": "play"
+                },
+                {
+                  "left": "karate",
+                  "right": "do"
+                },
+                {
+                  "left": "jogging",
+                  "right": "go"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "u8-grammar",
+          "title": "Grammar — was / were",
+          "page": 84,
+          "tasks": [
+            {
+              "id": "u8-t3",
+              "type": "gap-fill",
+              "title": "was / were",
+              "instruction": "Complete the sentences.",
+              "text": "1. I ___ at the gym yesterday evening. 2. We ___ tired after the match. 3. She ___ in a great mood! 4. The coaches ___ proud of the team.",
+              "blanks": [
+                {
+                  "answers": [
+                    "was"
+                  ]
+                },
+                {
+                  "answers": [
+                    "were"
+                  ]
+                },
+                {
+                  "answers": [
+                    "was"
+                  ]
+                },
+                {
+                  "answers": [
+                    "were"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "u9",
+      "title": "Unit 9 — Home sweet home",
+      "lessons": [
+        {
+          "id": "u9-vocab",
+          "title": "Vocabulary — house & furniture",
+          "page": 90,
+          "tasks": [
+            {
+              "id": "u9-t1",
+              "type": "matching",
+              "title": "Rooms & things",
+              "instruction": "Match the room to what you usually find there.",
+              "pairs": [
+                {
+                  "left": "kitchen",
+                  "right": "fridge and cooker"
+                },
+                {
+                  "left": "bathroom",
+                  "right": "shower and mirror"
+                },
+                {
+                  "left": "attic",
+                  "right": "old boxes upstairs"
+                },
+                {
+                  "left": "garage",
+                  "right": "car and tools"
+                }
+              ]
+            },
+            {
+              "id": "u9-t2",
+              "type": "find-and-click",
+              "title": "Prepositions of place",
+              "instruction": "Click all position prepositions in the description.",
+              "text": "The lamp is next to the sofa, the rug is under the table, and the pictures are above the shelf.",
+              "targets": [
+                "next",
+                "under",
+                "above"
+              ],
+              "mode": "words"
+            }
+          ]
+        },
+        {
+          "id": "u9-revision",
+          "title": "Revision — mixed",
+          "page": 96,
+          "tasks": [
+            {
+              "id": "u9-t3",
+              "type": "word-search",
+              "title": "Revision words",
+              "instruction": "Find five course words.",
+              "words": [
+                "FAMILY",
+                "SCHOOL",
+                "DIGITAL",
+                "ANIMAL",
+                "KITCHEN"
+              ],
+              "grid": [
+                [
+                  "F",
+                  "A",
+                  "M",
+                  "I",
+                  "L",
+                  "Y",
+                  "A",
+                  "B"
+                ],
+                [
+                  "X",
+                  "S",
+                  "C",
+                  "H",
+                  "O",
+                  "O",
+                  "L",
+                  "C"
+                ],
+                [
+                  "D",
+                  "D",
+                  "I",
+                  "G",
+                  "I",
+                  "T",
+                  "A",
+                  "L",
+                  "D"
+                ],
+                [
+                  "E",
+                  "A",
+                  "N",
+                  "I",
+                  "M",
+                  "A",
+                  "L",
+                  "F"
+                ],
+                [
+                  "G",
+                  "K",
+                  "I",
+                  "T",
+                  "C",
+                  "H",
+                  "E",
+                  "N",
+                  "H"
+                ]
+              ],
+              "note": "All words are horizontal."
+            },
+            {
+              "id": "u9-t4",
+              "type": "true-false",
+              "title": "Plural rule",
+              "instruction": "Most nouns form the plural by adding -s.",
+              "answer": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

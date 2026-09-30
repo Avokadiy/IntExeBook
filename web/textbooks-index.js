@@ -41,5 +41,19 @@ window.IEB_TEXTBOOKS = [
     "student": "Student's Book (11 tasks)",
     "workbook": "Workbook (8 tasks)",
     "folder": "sunny-book"
+  },
+  {
+    "id": "solutions-elementary",
+    "title": "Solutions Elementary (3rd edition)",
+    "subtitle": "Student's Book + Workbook",
+    "level": "CEFR A1–A2 (Elementary)",
+    "publisher": "Pearson — converted from SB/WB for IntExeBook",
+    "description": "Interactive versions of Starter + Units 1–9 exercises. Listening tasks carry audio placeholders — drop the real tracks into textbooks/solutions-elementary/assets/ and they start playing automatically.",
+    "cover": "",
+    "color": "#e11d48",
+    "icon": "🎓",
+    "student": "Student's Book (60 tasks)",
+    "workbook": "Workbook (23 tasks)",
+    "folder": "solutions-elementary"
   }
 ];
