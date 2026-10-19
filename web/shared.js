@@ -328,16 +328,71 @@
   /* ---------------------------------------------------------- pack format
      A ".iebpack.json" file bundles everything needed to hand a course to
      another teacher: manifest + both books + assets encoded as data URLs.  */
+  /* deterministic content fingerprint: identical content -> identical hash.
+     Used to detect re-imports of the same pack (no duplicates) and to tell
+     apart a genuine update from an unchanged file. */
+  function canonical(value) {
+    if (value === null || value === undefined) return "null";
+    if (typeof value !== "object") return JSON.stringify(value);
+    if (Array.isArray(value)) return "[" + value.map(canonical).join(",") + "]";
+    var keys = Object.keys(value).filter(function (k) { return value[k] !== undefined; }).sort();
+    return "{" + keys.map(function (k) { return JSON.stringify(k) + ":" + canonical(value[k]); }).join(",") + "}";
+  }
+  function fnv1a(str) {
+    var h = 0x811c9dc5 >>> 0;
+    for (var i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    // second round over reversed data widens the digest (16 hex chars)
+    var h2 = 0x811c9dc5 >>> 0;
+    for (var j = str.length - 1; j >= 0; j--) {
+      h2 ^= str.charCodeAt(j);
+      h2 = Math.imul(h2, 0x01000193) >>> 0;
+    }
+    return ("00000000" + h.toString(16)).slice(-8) + ("00000000" + h2.toString(16)).slice(-8);
+  }
+  function packFingerprint(manifest, books, assets) {
+    var assetNames = Object.keys(assets || {}).sort();
+    var core = {
+      title: (manifest && manifest.title) || "",
+      author: (manifest && manifest.author) || "",
+      level: (manifest && manifest.level) || "",
+      units: books || {},
+      media: assetNames
+    };
+    return fnv1a(canonical(core));
+  }
+
   function buildPack(obj) {
-    return {
+    var manifest = obj.manifest || {};
+    var books = obj.books || {};
+    var assets = obj.assets || {};
+    var pkg = {
       format: "ieb-pack",
       version: FORMAT_VERSION,
       exported: new Date().toISOString(),
       generator: "IntExeBook",
-      manifest: obj.manifest,
-      books: obj.books || {},
-      assets: obj.assets || {}
+      packageId: manifest.packageId || makePackageId(),
+      revision: typeof obj.revision === "number" ? obj.revision : (manifest.revision || 1),
+      fingerprint: packFingerprint(manifest, books, assets),
+      manifest: manifest,
+      books: books,
+      assets: assets
     };
+    return pkg;
+  }
+
+  function makePackageId() {
+    var rnd = "";
+    try {
+      var arr = new Uint8Array(8);
+      (self.crypto || window.crypto).getRandomValues(arr);
+      rnd = Array.prototype.map.call(arr, function (b) { return ("0" + b.toString(16)).slice(-2); }).join("");
+    } catch (e) {
+      rnd = Math.random().toString(16).slice(2, 10) + Math.random().toString(16).slice(2, 10);
+    }
+    return "pkg-" + rnd;
   }
 
   function readPack(json) {
@@ -366,7 +421,95 @@
         assets["assets/" + safe] = d.replace(/\s/g, "");
       }
     });
-    return { ok: errors.length === 0, errors: errors, manifest: mf.value, books: books, assets: assets };
+    return { ok: errors.length === 0, errors: errors, manifest: mf.value, books: books, assets: assets,
+             packageId: json.packageId || (mf.value && mf.value.packageId) || null,
+             revision: typeof json.revision === "number" ? json.revision : 1,
+             fingerprint: json.fingerprint || packFingerprint(mf.value, books, assets) };
+  }
+
+  /* ------------------------------------------------- smart import decision
+     Compare an incoming pack against what is already installed. Returns a
+     plan the UI shows to the teacher before anything is written:
+       install   – brand-new course, safe to add
+       duplicate – same content already installed, skip (no copies!)
+       update    – same packageId, newer/equal revision -> replace in place
+       fork      – same packageId but locally modified -> merge task-by-task */
+  function decidePackAction(pack, installed) {
+    // installed: [{packageId, revision, fingerprint}]
+    var same = null;
+    (installed || []).forEach(function (c) {
+      if (pack.packageId && c.packageId === pack.packageId) same = c;
+    });
+    if (!same) {
+      for (var i = 0; i < (installed || []).length; i++) {
+        var c = installed[i];
+        if (pack.fingerprint && c.fingerprint === pack.fingerprint)
+          return { action: "duplicate", existing: c, reason: "identical content is already installed" };
+      }
+      return { action: "install", reason: "new course" };
+    }
+    if (same.fingerprint && same.fingerprint === pack.fingerprint)
+      return { action: "duplicate", existing: same, reason: "this exact version is already installed" };
+    if ((pack.revision || 1) >= (same.revision || 1) && !same.localModified)
+      return { action: "update", existing: same, reason: "revision " + (same.revision || 1) + " → " + (pack.revision || 1) };
+    return { action: "fork", existing: same, reason: "both versions changed — tasks will be merged" };
+  }
+
+  /* three-way-ish merge of two books sharing one packageId: keep every task
+     from both sides, prefer the newer revision for identical task ids, and
+     namespace colliding new ids so nothing is silently lost or duplicated. */
+  function mergeBooks(base, incoming, incomingIsNewer) {
+    function index(book) {
+      var map = {};
+      ((book && book.units) || []).forEach(function (u) {
+        (u.lessons || []).forEach(function (l) {
+          (l.tasks || []).forEach(function (t) { map[t.id] = { unit: u.id, lesson: l.id, task: t }; });
+        });
+      });
+      return map;
+    }
+    var bIdx = index(base), iIdx = index(incoming);
+    var out = JSON.parse(JSON.stringify(base));
+    var taken = Object.keys(bIdx);
+    var stats = { added: 0, updated: 0, keptLocal: 0, renamed: 0 };
+    var lastUnit = out.units[out.units.length - 1];
+    ((incoming && incoming.units) || []).forEach(function (u) {
+      (u.lessons || []).forEach(function (l) {
+        (l.tasks || []).forEach(function (t) {
+          var old = iIdx[t.id];
+          if (!bIdx[t.id]) {
+            // only in the incoming copy -> append into a matching or new lesson
+            var target = findLesson(out, u.id, l.id, l.title);
+            var clone = JSON.parse(JSON.stringify(t));
+            if (taken.indexOf(clone.id) >= 0) { clone.id = "imp-" + Math.random().toString(36).slice(2, 8) + "-" + clone.id; stats.renamed++; }
+            target.tasks.push(clone); taken.push(clone.id); stats.added++;
+          } else if (incomingIsNewer) {
+            bIdx[t.id].task = t; // shared id, newer wins
+            replaceTask(out, u.id, l.id, t.id, t);
+            stats.updated++;
+          } else { stats.keptLocal++; }
+        });
+      });
+    });
+    return { value: out, stats: stats };
+  }
+  function findLesson(book, unitId, lessonId, title) {
+    var units = book.units || [];
+    var unit = units.filter(function (u) { return u.id === unitId; })[0] || units[units.length - 1];
+    if (!unit) { unit = { id: "u-imp-" + Date.now().toString(36), title: "Imported", lessons: [] }; book.units.push(unit); }
+    unit.lessons = unit.lessons || [];
+    var lesson = unit.lessons.filter(function (l) { return l.id === lessonId; })[0] ||
+                 unit.lessons.filter(function (l) { return l.title === title; })[0];
+    if (!lesson) { lesson = { id: "l-imp-" + Date.now().toString(36), title: title || "Imported", tasks: [] }; unit.lessons.push(lesson); }
+    lesson.tasks = lesson.tasks || [];
+    return lesson;
+  }
+  function replaceTask(book, unitId, lessonId, taskId, fresh) {
+    (book.units || []).forEach(function (u) {
+      (u.lessons || []).forEach(function (l) {
+        (l.tasks || []).forEach(function (t, i) { if (t.id === taskId) l.tasks[i] = fresh; });
+      });
+    });
   }
 
   /* ---------------------------------------------------------- starter pack
@@ -464,6 +607,7 @@
     slugify: slugify, makeId: makeId,
     validateTask: validateTask, validateBook: validateBook, validateManifest: validateManifest,
     buildPack: buildPack, readPack: readPack,
+    packFingerprint: packFingerprint, decidePackAction: decidePackAction, mergeBooks: mergeBooks,
     starterDraft: starterDraft
   };
 });

@@ -850,17 +850,81 @@ def unique_folder(base: str, base_dir: Optional[str] = None) -> str:
 
 
 def build_pack(manifest: dict, books: dict, assets: Optional[dict] = None) -> dict:
-    """Assemble a self-contained .iebpack.json (manifest + books + media)."""
+    """Assemble a self-contained .iebpack.json (manifest + books + media).
+
+    Every pack carries a *passport*: packageId (stable across versions),
+    revision (bumped on every re-export of the same course) and fingerprint
+    (deterministic hash of the content).  Importers use these three fields to
+    recognise updates instead of creating duplicate copies."""
     import datetime
+    manifest = manifest or {}
     return {
         "format": "ieb-pack",
         "version": 1,
         "exported": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "generator": "IntExeBook",
+        "packageId": manifest.get("packageId") or new_package_id(),
+        "revision": int(manifest.get("revision") or 1),
+        "fingerprint": pack_fingerprint(manifest, books, assets),
         "manifest": manifest,
         "books": books,
         "assets": assets or {},
     }
+
+
+def new_package_id() -> str:
+    import uuid
+    return "pkg-" + uuid.uuid4().hex[:16]
+
+
+def _canonical(value: Any) -> str:
+    """Deterministic JSON-ish serialisation: sorted keys, no whitespace."""
+    if isinstance(value, dict):
+        return "{" + ",".join(json.dumps(k, ensure_ascii=False) + ":" + _canonical(value[k])
+                               for k in sorted(value)) + "}"
+    if isinstance(value, list):
+        return "[" + ",".join(_canonical(v) for v in value) + "]"
+    return json.dumps(value, ensure_ascii=False, sort_keys=True)
+
+
+def pack_fingerprint(manifest: dict, books: dict, assets: Optional[dict] = None) -> str:
+    core = {
+        "title": (manifest or {}).get("title", ""),
+        "author": (manifest or {}).get("author", ""),
+        "level": (manifest or {}).get("level", ""),
+        "units": books or {},
+        "media": sorted((assets or {}).keys()),
+    }
+    return hashlib.sha256(_canonical(core).encode("utf-8")).hexdigest()[:16]
+
+
+def read_pack(pack: dict) -> dict:
+    """Validate a shared pack and extract its passport fields."""
+    if not isinstance(pack, dict) or pack.get("format") != "ieb-pack":
+        raise TextbookError("this is not an IntExeBook exercise pack (.iebpack.json)")
+    manifest = pack.get("manifest") or {}
+    books = pack.get("books") or {}
+    assets = pack.get("assets") or {}
+    return {
+        "packageId": pack.get("packageId") or manifest.get("packageId") or "",
+        "revision": int(pack.get("revision") or manifest.get("revision") or 1),
+        "fingerprint": pack.get("fingerprint") or pack_fingerprint(manifest, books, assets),
+        "manifest": manifest, "books": books, "assets": assets,
+    }
+
+
+def find_installed_by_package(package_id: str) -> Optional[dict]:
+    """Look through installed courses + published ones for a packageId."""
+    if not package_id:
+        return None
+    for folder in iter_textbook_folders():
+        try:
+            _f, m = get_textbook_meta(os.path.basename(folder))
+        except Exception:
+            continue
+        if m.get("packageId") == package_id:
+            return {"folder": os.path.basename(folder), "manifest": m}
+    return None
 
 
 def publish_course(payload: dict) -> dict:
