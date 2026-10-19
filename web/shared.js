@@ -729,46 +729,6 @@
     syncStorage().setItem("ieb-sync-installed", JSON.stringify(r));
   }
 
-  /* the heart of the one-button flow: pull everything, apply smart-import
-     decisions per package, remember what came from sync */
-  async function syncPull(onProgress) {
-    var cfg = syncConfig();
-    var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false };
-    var listed;
-    try {
-      listed = await syncListPacks(cfg);
-    } catch (e) {
-      result.errors.push("Cannot reach GitHub: " + e.message);
-      return result;
-    }
-    result.offline = !!listed.offline;
-    var installed = (window.IEB_INSTALLED_PACKS && window.IEB_INSTALLED_PACKS()) || [];
-    for (var i = 0; i < listed.packs.length; i++) {
-      var p = listed.packs[i];
-      if (onProgress) onProgress(i + 1, listed.packs.length, p.name);
-      try {
-        var pack = await syncDownloadPack(cfg, p.path);
-        var decision = decideImport(pack, installed);
-        if (decision.action === "skip") { result.skipped.push(p.name); continue; }
-        var reg = syncRegistry()[pack.packageId];
-        if (reg && reg.remotePath && reg.remotePath !== p.path) {
-          // same package already installed from another file path -> update it
-          decision = { action: "update", existing: reg, reason: "same packageId via sync" };
-        }
-        var install = await installPack(pack, decision);
-        syncRegistrySet(pack.packageId, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name });
-        // keep our local view of "installed" fresh for subsequent packages
-        installed = (window.IEB_INSTALLED_PACKS && window.IEB_INSTALLED_PACKS()) || installed;
-        if (decision.action === "merge") result.merged.push(install.title || p.name);
-        else if (decision.action === "update") result.updated.push(install.title || p.name);
-        else result.added.push(install.title || p.name);
-      } catch (e) {
-        result.errors.push(p.name + ": " + e.message);
-      }
-    }
-    return result;
-  }
-
   /* ------------------------------------------------------- installed view
      What is already on this machine, for the smart-import decision.
      Server mode: /api/installed-packs answers with packageId/revision/…
