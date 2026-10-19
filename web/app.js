@@ -165,10 +165,35 @@ function toast(msg, kind) {
   clearTimeout(el._h);
   el._h = setTimeout(() => { el.className = "ed-toast"; }, 7000);
 }
-async function doSync() {
+/* small settings dialog for the sync target — lets teachers change/renew
+   the token and point at another repo/branch without touching localStorage */
+async function syncSettingsDialog(SYNC) {
+  const cfg = SYNC.config();
+  const mask = t => t ? t.slice(0, 12) + "…" : "(not set)";
+  const what = prompt(
+    "⚙ Sync settings\n" +
+    "GitHub token [current: " + mask(cfg.token) + "] — leave empty to keep, type '-' to remove:\n" +
+    "Repository owner [current: " + cfg.owner + "] — leave empty to keep:\n" +
+    "Repository name [current: " + cfg.repo + "] — leave empty to keep:\n" +
+    "Branch [current: " + cfg.branch + "] — leave empty to keep:",
+    "\n\n\n\n");
+  if (what == null) return false;               /* cancelled */
+  const parts = what.split("\n").map(s => s.trim());
+  const next = Object.assign({}, cfg);
+  if (parts[0]) next.token = parts[0] === "-" ? "" : parts[0];
+  if (parts[1]) next.owner = parts[1];
+  if (parts[2]) next.repo = parts[2];
+  if (parts[3]) next.branch = parts[3];
+  SYNC.saveConfig(next);
+  toast("⚙ Sync settings saved", "ok");
+  return true;
+}
+
+async function doSync(reconfigure) {
   if (syncing) return;
   const SYNC = window.IEB_SYNC || (window.IEB_SHARED && window.IEB_SHARED.sync);
   if (!SYNC) { toast("Sync module is not loaded", "bad"); return; }
+  if (reconfigure) { if (!await syncSettingsDialog(SYNC)) return; }
   const cfg = SYNC.config();
   if (!cfg.token) {
     const tok = prompt("Paste your GitHub token to enable sharing.\nIt is stored only in this browser (localStorage).\nYou can leave it empty to just browse shared courses read-only:");
@@ -187,12 +212,19 @@ async function doSync() {
     if (res.updated.length) bits.push("↻ updated: " + res.updated.join(", "));
     if (res.merged.length)  bits.push("🤝 merged (changes of several teachers combined): " + res.merged.join(", "));
     if (res.skipped.length) bits.push("＝ already up to date: " + res.skipped.length + " course(s)");
+    if (res.note && !res.added.length && !res.updated.length && !res.merged.length && !res.skipped.length)
+      bits.push("(" + res.note + ")");
     if (res.offline)        bits.push("(offline — showing last known list)");
     if (res.errors.length)  bits.push("⚠ " + res.errors.join("; "));
     toast("🔄 Sync finished\n" + (bits.join("\n") || "Nothing changed."), res.errors.length ? "bad" : "ok");
     invalidateCachesAndRefresh();
   } catch (e) {
-    toast("Sync failed: " + e.message, "bad");
+    const msg = String(e && e.message || e);
+    /* auth/config problems -> offer to change the token right away */
+    if (/token|401|403|Bad credentials|rejected/i.test(msg)) {
+      if (confirm(msg + "\n\nOpen sync settings to paste a new token?")) { doSync(true); return; }
+    }
+    toast("Sync failed: " + msg, "bad");
   } finally {
     syncing = false;
     syncBtn.disabled = false;
@@ -204,7 +236,12 @@ function invalidateCachesAndRefresh() {
   Object.keys(taskCache).forEach(k => delete taskCache[k]);
   route();
 }
-if (syncBtn) syncBtn.addEventListener("click", doSync);
+if (syncBtn) {
+  syncBtn.addEventListener("click", () => doSync(false));
+  /* right-click / long-press opens the settings dialog (change token etc.) */
+  syncBtn.addEventListener("contextmenu", (ev) => { ev.preventDefault(); doSync(true); });
+  syncBtn.title = "Update shared exercises. Right-click → sync settings (change token, repo, branch).";
+}
 
 /* ------------------------------------------------------------ helpers */
 async function loadBookMeta(tbId) {

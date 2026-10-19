@@ -657,29 +657,85 @@
     return res;
   }
 
-  /* list pack files in the shared folder (Contents API; falls back to the
-     locally cached index when offline / no token) */
+  /* list pack files in the shared folder.
+     Robust against every common failure mode so teachers never see a raw
+     404:
+       * folder missing on GitHub  -> auto-create it via an empty commit
+         (needs a token; read-only users just get an empty list);
+       * wrong branch name         -> resolve the repo default branch and
+         save the fix into the local config;
+       * network/token problems    -> fall back to the cached index. */
   async function syncListPacks(cfg) {
     cfg = cfg || syncConfig();
     var cacheKey = "ieb-sync-index";
-    try {
-      var res = await ghFetch(apiBase(cfg) + "/contents/" + encodeURIComponent(cfg.folder) + "?ref=" + encodeURIComponent(cfg.branch), {
-        headers: { Authorization: "Bearer " + cfg.token, Accept: "application/vnd.github+json" }
-      });
-      var entries = await res.json();
+    var url = function (branch) {
+      return apiBase(cfg) + "/contents/" + encodeURIComponent(cfg.folder) + "?ref=" + encodeURIComponent(branch);
+    };
+    var headers = { Accept: "application/vnd.github+json" };
+    if (cfg.token) headers.Authorization = "Bearer " + cfg.token;
+
+    function collect(entries) {
       var packs = [];
       (Array.isArray(entries) ? entries : []).forEach(function (f) {
         if (/\.iebpack\.json$/i.test(f.name)) packs.push({ name: f.name, path: f.path, sha: f.sha, size: f.size });
       });
       try { syncStorage().setItem(cacheKey, JSON.stringify({ at: Date.now(), packs: packs })); } catch (e) {}
-      return { packs: packs, offline: false };
-    } catch (e) {
-      try {
-        var cached = JSON.parse(syncStorage().getItem(cacheKey) || "null");
-        if (cached && cached.packs) return { packs: cached.packs, offline: true, error: e.message };
-      } catch (e2) {}
-      throw e;
+      return packs;
     }
+
+    var lastErr = null;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        var res = await fetch(url(cfg.branch), { headers: headers });
+        if (res.status === 404) {
+          var body = {};
+          try { body = await res.json(); } catch (e) {}
+          var msg = String(body.message || "");
+          if (/not found|does not exist/i.test(msg) && /version|ref|branch/i.test(msg)) {
+            /* branch name is wrong -> adopt the repository's default branch */
+            try {
+              var meta = await ghFetch(apiBase(cfg), { headers: headers });
+              var def = (await meta.json()).default_branch;
+              if (def && def !== cfg.branch) {
+                cfg.branch = def;
+                var saved = syncConfig(); saved.branch = def; saveSyncConfig(saved);
+              }
+            } catch (e2) { /* keep trying with what we have */ }
+            continue;
+          }
+          if (/This repository is empty|Not Found/i.test(msg) || msg === "") {
+            /* shared folder does not exist yet -> create it (first publish) */
+            if (!cfg.token) return { packs: [], offline: false, note: "shared-exercises folder is empty" };
+            try {
+              await ghFetch(apiBase(cfg) + "/contents/" + encodeURIComponent(cfg.folder) + "/.keep", {
+                method: "PUT",
+                headers: Object.assign({ "Content-Type": "application/json" }, headers),
+                body: JSON.stringify({ message: "chore: create shared-exercises folder", content: "", branch: cfg.branch })
+              });
+              continue; /* now the folder exists — list again */
+            } catch (e3) {
+              return { packs: [], offline: false, note: "shared-exercises folder is empty" };
+            }
+          }
+          throw new Error("HTTP 404 — " + msg + " (" + cfg.owner + "/" + cfg.repo + "@" + cfg.branch + ")");
+        }
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return { packs: collect(await res.json()), offline: false };
+      } catch (e) {
+        lastErr = e;
+        if (e && /HTTP 40[13]|Bad credentials/i.test(String(e.message))) break; /* auth issue: retrying won't help */
+      }
+    }
+    /* all attempts failed -> serve the last known index if we have one */
+    try {
+      var cached = JSON.parse(syncStorage().getItem(cacheKey) || "null");
+      if (cached && cached.packs) return { packs: cached.packs, offline: true, error: lastErr && lastErr.message };
+    } catch (e2) {}
+    /* nothing fatal — treat as "no courses published yet" unless it's clearly auth */
+    if (lastErr && /HTTP 40[13]|Bad credentials/i.test(String(lastErr.message))) {
+      throw new Error("GitHub rejected access (token expired/revoked?). Open Sync settings and paste a fresh token.");
+    }
+    return { packs: [], offline: false, note: "shared-exercises folder is empty" };
   }
 
   /* download one pack file over the public raw endpoint (works even without a token) */
@@ -791,7 +847,7 @@
      decisions per package, remember what came from sync */
   async function syncPull(onProgress) {
     var cfg = syncConfig();
-    var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false };
+    var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false, note: "" };
     var listed;
     try {
       listed = await syncListPacks(cfg);
@@ -800,6 +856,7 @@
       return result;
     }
     result.offline = !!listed.offline;
+    if (listed.note) result.note = listed.note;
     var installed = await listInstalledPacks();
     for (var i = 0; i < listed.packs.length; i++) {
       var p = listed.packs[i];
