@@ -163,6 +163,10 @@ class Handler(BaseHTTPRequestHandler):
             if parts == ["api", "textbooks"]:
                 return self._send_json({"textbooks": loader.scan_textbooks()})
 
+            # GET /api/installed-packs  -> passport view for smart import/sync
+            if parts == ["api", "installed-packs"]:
+                return self._send_json({"packs": loader.installed_packs()})
+
             # GET /api/textbooks/<id>/book/<slot>      -> unit/lesson/task tree
             if (len(parts) == 5 and parts[0] == "api"
                     and parts[3] == "book" and parts[1] == "textbooks"):

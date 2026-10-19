@@ -149,6 +149,63 @@ if (themeBtn) {
   paintThemeButton();
 }
 
+/* ------------------------------------------------------- one-button sync */
+const syncBtn = document.getElementById("syncBtn");
+let syncing = false;
+function toast(msg, kind) {
+  let el = document.getElementById("edToast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "edToast";
+    el.className = "ed-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = "ed-toast show" + (kind ? " " + kind : "");
+  clearTimeout(el._h);
+  el._h = setTimeout(() => { el.className = "ed-toast"; }, 7000);
+}
+async function doSync() {
+  if (syncing) return;
+  const SYNC = window.IEB_SYNC || (window.IEB_SHARED && window.IEB_SHARED.sync);
+  if (!SYNC) { toast("Sync module is not loaded", "bad"); return; }
+  const cfg = SYNC.config();
+  if (!cfg.token) {
+    const tok = prompt("Paste your GitHub token to enable sharing.\nIt is stored only in this browser (localStorage).\nYou can leave it empty to just browse shared courses read-only:");
+    if (tok != null) { cfg.token = tok.trim(); SYNC.saveConfig(cfg); }
+  }
+  syncing = true;
+  syncBtn.disabled = true;
+  const oldLabel = syncBtn.textContent;
+  try {
+    syncBtn.textContent = "⏳ Updating…";
+    const res = await SYNC.pull((done, total, name) => {
+      syncBtn.textContent = "⏳ " + done + "/" + total;
+    });
+    const bits = [];
+    if (res.added.length)   bits.push("＋ new: " + res.added.join(", "));
+    if (res.updated.length) bits.push("↻ updated: " + res.updated.join(", "));
+    if (res.merged.length)  bits.push("🤝 merged (changes of several teachers combined): " + res.merged.join(", "));
+    if (res.skipped.length) bits.push("＝ already up to date: " + res.skipped.length + " course(s)");
+    if (res.offline)        bits.push("(offline — showing last known list)");
+    if (res.errors.length)  bits.push("⚠ " + res.errors.join("; "));
+    toast("🔄 Sync finished\n" + (bits.join("\n") || "Nothing changed."), res.errors.length ? "bad" : "ok");
+    invalidateCachesAndRefresh();
+  } catch (e) {
+    toast("Sync failed: " + e.message, "bad");
+  } finally {
+    syncing = false;
+    syncBtn.disabled = false;
+    syncBtn.textContent = oldLabel;
+  }
+}
+function invalidateCachesAndRefresh() {
+  Object.keys(bookCache).forEach(k => delete bookCache[k]);
+  Object.keys(taskCache).forEach(k => delete taskCache[k]);
+  route();
+}
+if (syncBtn) syncBtn.addEventListener("click", doSync);
+
 /* ------------------------------------------------------------ helpers */
 async function loadBookMeta(tbId) {
   const all = FILE_MODE ? await loadFileModeIndex() : await getJSON("/api/textbooks");

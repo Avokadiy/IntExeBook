@@ -1151,13 +1151,187 @@ def patch_textbook(id_or_folder: str, payload: dict) -> dict:
 
 
 def import_pack(pack: dict, new_id: Optional[str] = None) -> dict:
-    """Install a shared ".iebpack.json" bundle as a new local course."""
+    """Install a shared ".iebpack.json" bundle as a local course.
+
+    Smart-import rules (anti-duplicate / multi-teacher):
+      * same packageId + identical fingerprint   -> nothing to do ("skip")
+      * same packageId + newer revision          -> UPDATE the existing folder
+      * same packageId, both sides changed       -> MERGE task-by-task and bump
+        the revision above every contributor's version
+      * unknown packageId                        -> install as a new course
+    """
     if not isinstance(pack, dict) or pack.get("format") != "ieb-pack":
         raise TextbookError("this is not an IntExeBook exercise pack (.iebpack.json)")
+    info = read_pack(pack)
+    package_id = info["packageId"]
+    existing = find_installed_by_package(package_id) if package_id else None
+    if existing:
+        folder = existing["folder"]
+        cur_mf = existing["manifest"]
+        cur_fp = cur_mf.get("fingerprint") or ""
+        cur_rev = int(cur_mf.get("revision") or 1)
+        if info["fingerprint"] and cur_fp == info["fingerprint"]:
+            return {"folder": os.path.basename(folder), "id": cur_mf.get("id"),
+                    "title": cur_mf.get("title", ""), "action": "skip",
+                    "packageId": package_id}
+        try:
+            cur_books = {}
+            for slot in ("student", "workbook"):
+                bpath = os.path.join(folder, slot + ".json")
+                if os.path.isfile(bpath):
+                    with open(bpath, encoding="utf-8") as fh:
+                        cur_books[slot] = json.load(fh)
+        except Exception:
+            cur_books = {}
+        merged_manifest, merged_books, merged_rev = merge_pack_with_local(
+            info, {"manifest": cur_mf, "books": cur_books})
+        payload = {"manifest": merged_manifest, "books": merged_books, "assets": info["assets"]}
+        res = patch_textbook(os.path.basename(folder), payload)
+        # store passport fields into the manifest so future imports recognise it
+        mf_path = _find_manifest(folder)
+        saved = _read_manifest(mf_path)
+        saved.update({"packageId": package_id, "revision": merged_rev,
+                      "fingerprint": merged_manifest.get("fingerprint") or info["fingerprint"],
+                      "contributors": merged_manifest.get("contributors", [])})
+        with open(mf_path, "w", encoding="utf-8") as fh:
+            json.dump(saved, fh, ensure_ascii=False, indent=2)
+        invalidate_cache()
+        action = "update" if cur_rev <= merged_rev else "merge"
+        res.update({"action": action, "packageId": package_id, "revision": merged_rev})
+        return res
+    # brand-new course
     payload = {"manifest": pack.get("manifest"), "books": pack.get("books"), "assets": pack.get("assets")}
     if new_id:
         payload["manifest"] = dict(payload["manifest"] or {}, id=slugify(new_id))
-    return create_textbook(payload)
+    # stamp the passport into the manifest so re-imports update instead of copy
+    payload["manifest"] = dict(payload["manifest"] or {},
+                               packageId=package_id, revision=info["revision"],
+                               fingerprint=info["fingerprint"])
+    res = create_textbook(payload)
+    res.update({"action": "install", "packageId": package_id, "revision": info["revision"]})
+    return res
+
+
+# ------------------------------------------------------- multi-teacher merge
+def _task_fingerprint(task: dict) -> str:
+    return hashlib.sha256(_canonical(task).encode("utf-8")).hexdigest()[:16]
+
+
+def _walk_tasks(book: dict):
+    for u in book.get("units") or []:
+        for l in u.get("lessons") or []:
+            for t in l.get("tasks") or []:
+                yield u, l, t
+
+
+def merge_pack_with_local(incoming: dict, local: dict) -> tuple:
+    """Merge two versions of ONE course (same packageId) task-by-task.
+
+    Rules that let several teachers edit the same course independently:
+      * tasks only one side changed/added  -> kept from that side
+      * both sides edited the SAME task    -> the higher-revision author wins
+        the body, but BOTH authors are recorded in the task's contributors
+      * revisions are combined: new revision = max(local, incoming) + 1
+    Returns (manifest, books, new_revision)."""
+    import datetime
+    inc_mf = incoming["manifest"] or {}
+    loc_mf = local["manifest"] or {}
+    inc_books = incoming["books"] or {}
+    loc_books = local["books"] or {}
+    inc_rev = int(incoming.get("revision") or 1)
+    loc_rev = int(loc_mf.get("revision") or 1)
+    inc_author = _s(inc_mf.get("author")) or "unknown"
+    loc_author = _s(loc_mf.get("author")) or "unknown"
+
+    # index local tasks by id
+    loc_tasks = {t.get("id"): t for _u, _l, t in _walk_tasks_of(inc_books, loc_books)}
+
+    def _walk_tasks_of(_i, loc_book_dict):
+        out = []
+        for slot, b in (loc_book_dict or {}).items():
+            if isinstance(b, dict):
+                out.extend(list(_walk_tasks(b)))
+        return out
+
+    merged_books: dict = {}
+    conflicts = 0
+    for slot in ("student", "workbook"):
+        inc_b = inc_books.get(slot)
+        loc_b = loc_books.get(slot)
+        if not inc_b:
+            continue
+        if not loc_b:
+            merged_books[slot] = inc_b
+            continue
+        merged = json.loads(json.dumps(inc_b))  # start from the incoming structure
+        # append local lessons/tasks that the incoming pack does not know about
+        inc_lesson_ids = {l.get("id") for u in merged.get("units") or [] for l in u.get("lessons") or []}
+        inc_task_ids = {t.get("id") for _u, _l, t in _walk_tasks(merged)}
+        for u in loc_b.get("units") or []:
+            target_unit = next((mu for mu in merged.get("units") or [] if mu.get("id") == u.get("id")), None)
+            for l in u.get("lessons") or []:
+                if l.get("id") not in inc_lesson_ids:
+                    (target_unit or (merged.setdefault("units", [{}])[0])
+                     .setdefault("lessons", [])).append(l)
+                    continue
+                for t in l.get("tasks") or []:
+                    tid = t.get("id")
+                    if tid not in inc_task_ids:
+                        # local-only task: keep it
+                        tl = next((ml for mu in merged.get("units") or []
+                                   for ml in mu.get("lessons") or [] if ml.get("id") == l.get("id")), None)
+                        if tl is not None:
+                            tl.setdefault("tasks", []).append(t)
+                        continue
+                    # present on both sides — compare against the stored base
+                    base = loc_tasks.get(tid)
+                    inc_t = next((it for _iu, _il, it in _walk_tasks(merged) if it.get("id") == tid), None)
+                    if inc_t is None:
+                        continue
+                    inc_changed = _task_fingerprint(inc_t) != _task_fingerprint(base) if base else True
+                    loc_changed = base is not None and _task_fingerprint(base) != _task_fingerprint(t)
+                    if loc_changed and not inc_changed:
+                        # replace incoming task with the locally edited one
+                        idx = next((i for i, x in enumerate(_find_owner_lesson(merged, tid)[1].get("tasks") or [])
+                                    if x.get("id") == tid), None)
+                        if idx is not None:
+                            _find_owner_lesson(merged, tid)[1]["tasks"][idx] = t
+                        conflicts += 1
+                    elif loc_changed and inc_changed:
+                        # both edited: higher revision wins, record both authors
+                        winner = t if loc_rev > inc_rev else inc_t
+                        loser = inc_t if loc_rev > inc_rev else t
+                        contribs = sorted(set(
+                            (winner.get("contributors") or []) + (loser.get("contributors") or []) +
+                            [loc_author, inc_author]))
+                        winner["contributors"] = contribs
+                        idx = next((i for i, x in enumerate(_find_owner_lesson(merged, tid)[1].get("tasks") or [])
+                                    if x.get("id") == tid), None)
+                        if idx is not None:
+                            _find_owner_lesson(merged, tid)[1]["tasks"][idx] = winner
+                        conflicts += 1
+        merged_books[slot] = merged
+
+    new_rev = max(inc_rev, loc_rev) + (1 if conflicts or inc_rev == loc_rev else 0)
+    contribs = sorted(set((loc_mf.get("contributors") or []) + (inc_mf.get("contributors") or []) +
+                          [loc_author, inc_author]))
+    manifest = dict(inc_mf)
+    manifest["author"] = loc_mf.get("author") or inc_mf.get("author")
+    manifest["contributors"] = contribs
+    manifest["packageId"] = incoming["packageId"]
+    manifest["revision"] = new_rev
+    manifest["updated"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
+    manifest["fingerprint"] = pack_fingerprint(manifest, merged_books, incoming.get("assets") or {})
+    return manifest, merged_books, new_rev
+
+
+def _find_owner_lesson(book: dict, task_id: str):
+    for u in book.get("units") or []:
+        for l in u.get("lessons") or []:
+            for t in l.get("tasks") or []:
+                if t.get("id") == task_id:
+                    return u, l
+    return None, None
 
 
 # --------------------------------------------------------------- bulk import
@@ -1399,16 +1573,85 @@ def scan_textbooks() -> list[dict]:
             "source": manifest.get("source", "") or "shared",
             "books": books,
         })
-    # de-duplicate by card id (e.g. an archive and its unpacked folder coexist)
+    # flat shared packs that live straight in shared-exercises/*.iebpack.json
+    # (the one-file format teachers send each other / sync via GitHub). They
+    # are not folders, so scan them as pack cards too.
+    if os.path.isdir(SHARED_DIR):
+        for entry in sorted(os.listdir(SHARED_DIR)):
+            if not entry.endswith(PACK_EXT):
+                continue
+            try:
+                with open(os.path.join(SHARED_DIR, entry), encoding="utf-8") as fh:
+                    pk = json.load(fh)
+                mf = pk.get("manifest") or {}
+                books = [{"slot": s, "label": mf.get(s) or lbl}
+                         for s, lbl in (("student", "Student's Book"), ("workbook", "Workbook"))
+                         if (pk.get("books") or {}).get(s)]
+                cards.append({
+                    "folder": entry, "id": mf.get("id") or entry[: -len(PACK_EXT)],
+                    "title": mf.get("title") or entry,
+                    "level": mf.get("level", ""),
+                    "description": mf.get("description", ""),
+                    "cover": mf.get("cover", ""), "publisher": mf.get("publisher", ""),
+                    "icon": mf.get("icon", ""), "author": mf.get("author", ""),
+                    "source": "shared-pack",
+                    "packageId": pk.get("packageId"),
+                    "revision": pk.get("revision", 1),
+                    "books": books,
+                })
+            except Exception:
+                continue  # a broken pack must not break the library
+
+    # de-duplicate: same packageId counts as ONE course even if it exists as
+    # both a folder and a flat .iebpack.json file (anti-copy guarantee)
     seen: set[str] = set()
+    by_package: dict[str, dict] = {}
     unique = []
     for c in cards:
+        pid = c.get("packageId")
+        if pid:
+            prev = by_package.get(pid)
+            if prev is None:
+                by_package[pid] = c
+                unique.append(c)
+            else:
+                # prefer richer card (a real folder over a flat pack)
+                if prev.get("source") == "shared-pack" and c.get("source") != "shared-pack":
+                    unique[unique.index(prev)] = c
+                    by_package[pid] = c
+            continue
         key = c.get("id") or c.get("folder")
         if key in seen:
             continue
         seen.add(key)
         unique.append(c)
     return unique
+
+
+def installed_packs() -> list[dict]:
+    """Passport view of everything already on this machine — used by the
+    client-side smart-import/sync to decide install/update/merge/skip."""
+    out: list[dict] = []
+    try:
+        for c in scan_textbooks():
+            mf: dict = {}
+            try:
+                folder, mf = get_textbook_meta(c.get("folder") or c.get("id") or "")
+            except Exception:
+                mf = {}
+            pkg = c.get("packageId") or mf.get("packageId")
+            if not pkg:
+                continue
+            out.append({
+                "packageId": pkg,
+                "revision": int(mf.get("revision") or c.get("revision") or 1),
+                "fingerprint": mf.get("fingerprint") or "",
+                "title": c.get("title", ""),
+                "localModified": bool(mf.get("localModified")),
+            })
+    except Exception:
+        pass
+    return out
 
 
 def _ensure_folder_for(base_dir: str, entry: str) -> Optional[str]:

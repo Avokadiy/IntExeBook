@@ -600,6 +600,291 @@
     return { ok: placedAll, rows: grid.map(function (row) { return row.join(""); }) };
   }
 
+  /* =====================================================================
+   * GITHUB SYNC — the one-button "🔄 Sync" sharing channel (no extra server)
+   *
+   * The teachers' shared repository IS a GitHub repo (default: the IntExeBook
+   * repo itself). Published courses live under shared-exercises/ as flat
+   * <packageId>.iebpack.json files (one file per course pack -> two authors
+   * can never overwrite each other's files); the app reads them via
+   * raw.githubusercontent.com and writes them via the Contents API with a
+   * fine-grained PAT.
+   * ===================================================================== */
+
+  var SYNC_DEFAULTS = { owner: "Avokadiy", repo: "IntExeBook", branch: "audio-and-dark-theme-5c6ce", folder: "shared-exercises" };
+
+  function syncStorage() {
+    /* works in the browser (localStorage) and in Node tests (in-memory) */
+    if (typeof localStorage !== "undefined") return localStorage;
+    var mem = {};
+    return { getItem: function (k) { return mem[k] === undefined ? null : mem[k]; },
+             setItem: function (k, v) { mem[k] = String(v); },
+             removeItem: function (k) { delete mem[k]; } };
+  }
+
+  function syncConfig() {
+    try {
+      var c = JSON.parse(syncStorage().getItem("ieb-sync-config") || "{}");
+      return {
+        owner: c.owner || SYNC_DEFAULTS.owner,
+        repo: c.repo || SYNC_DEFAULTS.repo,
+        branch: c.branch || SYNC_DEFAULTS.branch,
+        folder: c.folder || SYNC_DEFAULTS.folder,
+        token: c.token || ""
+      };
+    } catch (e) { return Object.assign({}, SYNC_DEFAULTS); }
+  }
+
+  function saveSyncConfig(cfg) {
+    syncStorage().setItem("ieb-sync-config", JSON.stringify(cfg));
+  }
+
+  function rawUrl(cfg, path) {
+    return "https://raw.githubusercontent.com/" + cfg.owner + "/" + cfg.repo + "/" + cfg.branch + "/" + path;
+  }
+
+  function apiBase(cfg) {
+    return "https://api.github.com/repos/" + cfg.owner + "/" + cfg.repo;
+  }
+
+  async function ghFetch(url, opts) {
+    var res = await fetch(url, opts);
+    if (!res.ok) {
+      var msg = "HTTP " + res.status;
+      try { var j = await res.json(); if (j.message) msg += " — " + j.message; } catch (e) {}
+      throw new Error(msg);
+    }
+    return res;
+  }
+
+  /* list pack files in the shared folder (Contents API; falls back to the
+     locally cached index when offline / no token) */
+  async function syncListPacks(cfg) {
+    cfg = cfg || syncConfig();
+    var cacheKey = "ieb-sync-index";
+    try {
+      var res = await ghFetch(apiBase(cfg) + "/contents/" + encodeURIComponent(cfg.folder) + "?ref=" + encodeURIComponent(cfg.branch), {
+        headers: { Authorization: "Bearer " + cfg.token, Accept: "application/vnd.github+json" }
+      });
+      var entries = await res.json();
+      var packs = [];
+      (Array.isArray(entries) ? entries : []).forEach(function (f) {
+        if (/\.iebpack\.json$/i.test(f.name)) packs.push({ name: f.name, path: f.path, sha: f.sha, size: f.size });
+      });
+      try { syncStorage().setItem(cacheKey, JSON.stringify({ at: Date.now(), packs: packs })); } catch (e) {}
+      return { packs: packs, offline: false };
+    } catch (e) {
+      try {
+        var cached = JSON.parse(syncStorage().getItem(cacheKey) || "null");
+        if (cached && cached.packs) return { packs: cached.packs, offline: true, error: e.message };
+      } catch (e2) {}
+      throw e;
+    }
+  }
+
+  /* download one pack file over the public raw endpoint (works even without a token) */
+  async function syncDownloadPack(cfg, path) {
+    cfg = cfg || syncConfig();
+    var res = await ghFetch(rawUrl(cfg, path));
+    return await res.json();
+  }
+
+  /* upload (create or update) one pack file via the Contents API */
+  async function syncUploadPack(cfg, name, packObj) {
+    cfg = cfg || syncConfig();
+    if (!cfg.token) throw new Error("No GitHub token configured for sync");
+    var path = cfg.folder + "/" + name;
+    var content = btoa(unescape(encodeURIComponent(JSON.stringify(packObj, null, 1))));
+    var sha = null;
+    try {
+      var existing = await ghFetch(apiBase(cfg) + "/contents/" + encodeURIComponent(path) + "?ref=" + encodeURIComponent(cfg.branch), {
+        headers: { Authorization: "Bearer " + cfg.token }
+      });
+      var ej = await existing.json();
+      sha = ej.sha || null;
+    } catch (e) { /* file does not exist yet -> create */ }
+    var body = {
+      message: (sha ? "sync(update)" : "sync(add)") + ": " + name + " · rev " + (packObj.revision || 1) + " by " + (packObj.author || "?"),
+      content: content,
+      branch: cfg.branch
+    };
+    if (sha) body.sha = sha;
+    await ghFetch(apiBase(cfg) + "/contents/" + encodeURIComponent(path), {
+      method: sha ? "PUT" : "PUT",
+      headers: { Authorization: "Bearer " + cfg.token, Accept: "application/vnd.github+json", "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    return { path: path, updated: !!sha };
+  }
+
+  /* ------------------------------------------------------- local registry
+     Installed-from-sync courses are remembered so that re-running Sync
+     UPDATES them in place instead of creating copies. */
+  function syncRegistry() {
+    try { return JSON.parse(syncStorage().getItem("ieb-sync-installed") || "{}"); } catch (e) { return {}; }
+  }
+  function syncRegistrySet(packageId, entry) {
+    var r = syncRegistry();
+    r[packageId] = entry;
+    syncStorage().setItem("ieb-sync-installed", JSON.stringify(r));
+  }
+
+  /* the heart of the one-button flow: pull everything, apply smart-import
+     decisions per package, remember what came from sync */
+  async function syncPull(onProgress) {
+    var cfg = syncConfig();
+    var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false };
+    var listed;
+    try {
+      listed = await syncListPacks(cfg);
+    } catch (e) {
+      result.errors.push("Cannot reach GitHub: " + e.message);
+      return result;
+    }
+    result.offline = !!listed.offline;
+    var installed = (window.IEB_INSTALLED_PACKS && window.IEB_INSTALLED_PACKS()) || [];
+    for (var i = 0; i < listed.packs.length; i++) {
+      var p = listed.packs[i];
+      if (onProgress) onProgress(i + 1, listed.packs.length, p.name);
+      try {
+        var pack = await syncDownloadPack(cfg, p.path);
+        var decision = decideImport(pack, installed);
+        if (decision.action === "skip") { result.skipped.push(p.name); continue; }
+        var reg = syncRegistry()[pack.packageId];
+        if (reg && reg.remotePath && reg.remotePath !== p.path) {
+          // same package already installed from another file path -> update it
+          decision = { action: "update", existing: reg, reason: "same packageId via sync" };
+        }
+        var install = await installPack(pack, decision);
+        syncRegistrySet(pack.packageId, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name });
+        // keep our local view of "installed" fresh for subsequent packages
+        installed = (window.IEB_INSTALLED_PACKS && window.IEB_INSTALLED_PACKS()) || installed;
+        if (decision.action === "merge") result.merged.push(install.title || p.name);
+        else if (decision.action === "update") result.updated.push(install.title || p.name);
+        else result.added.push(install.title || p.name);
+      } catch (e) {
+        result.errors.push(p.name + ": " + e.message);
+      }
+    }
+    return result;
+  }
+
+  /* ------------------------------------------------------- installed view
+     What is already on this machine, for the smart-import decision.
+     Server mode: /api/installed-packs answers with packageId/revision/…
+     file:// mode: fall back to the local sync registry (courses that were
+     pulled from GitHub before). */
+  async function listInstalledPacks() {
+    try {
+      if (typeof fetch === "function" && typeof location !== "undefined" &&
+          (location.protocol === "http:" || location.protocol === "https:") &&
+          /^(localhost|127\.|\[::1\])/.test(location.hostname)) {
+        var res = await fetch("/api/installed-packs");
+        if (res.ok) {
+          var j = await res.json();
+          if (Array.isArray(j.packs)) return j.packs;
+        }
+      }
+    } catch (e) { /* no server — use the local registry below */ }
+    var reg = syncRegistry();
+    return Object.keys(reg).map(function (pid) {
+      var r = reg[pid];
+      return { packageId: pid, revision: r.revision || 1, fingerprint: r.fingerprint || null };
+    });
+  }
+
+  /* install one downloaded pack through the local backend (server mode);
+     in file:// mode there is no backend, so we remember it locally and hand
+     the JSON back to the caller to offer a .iebpack download instead. */
+  async function installPack(pack, decision) {
+    var title = (pack.manifest && pack.manifest.title) || pack.packageId || "course";
+    try {
+      if (typeof fetch === "function" && typeof location !== "undefined" &&
+          (location.protocol === "http:" || location.protocol === "https:") &&
+          /^(localhost|127\.|\[::1\])/.test(location.hostname)) {
+        var res = await fetch("/api/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pack: pack })
+        });
+        if (!res.ok) {
+          var msg = "HTTP " + res.status;
+          try { var j = await res.json(); if (j.error) msg += " — " + j.error; } catch (e) {}
+          throw new Error(msg);
+        }
+        var out = await res.json();
+        out.title = out.title || title;
+        return out;
+      }
+    } catch (e) {
+      if (e && /HTTP|Failed/.test(String(e.message))) throw e; // real backend error
+      /* no backend at all -> offline install: remember + return for download */
+    }
+    syncRegistrySet(pack.packageId, {
+      remotePath: null, revision: pack.revision || 1,
+      fingerprint: pack.fingerprint, name: title, offline: true
+    });
+    return { action: (decision && decision.action) || "install", title: title, offline: true, pack: pack };
+  }
+
+  /* the heart of the one-button flow: pull everything, apply smart-import
+     decisions per package, remember what came from sync */
+  async function syncPull(onProgress) {
+    var cfg = syncConfig();
+    var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false };
+    var listed;
+    try {
+      listed = await syncListPacks(cfg);
+    } catch (e) {
+      result.errors.push("Cannot reach GitHub: " + e.message);
+      return result;
+    }
+    result.offline = !!listed.offline;
+    var installed = await listInstalledPacks();
+    for (var i = 0; i < listed.packs.length; i++) {
+      var p = listed.packs[i];
+      if (onProgress) onProgress(i + 1, listed.packs.length, p.name);
+      try {
+        var pack = await syncDownloadPack(cfg, p.path);
+        var decision = decidePackAction(pack, installed);
+        if (decision.action === "duplicate") { result.skipped.push(p.name); continue; }
+        var install = await installPack(pack, decision);
+        syncRegistrySet(pack.packageId, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name });
+        installed = await listInstalledPacks();   // keep the view fresh for later files
+        var act = install.action || decision.action;
+        if (act === "merge" || act === "fork") result.merged.push(install.title || p.name);
+        else if (act === "update") result.updated.push(install.title || p.name);
+        else if (act !== "skip") result.added.push(install.title || p.name);
+      } catch (e) {
+        result.errors.push(p.name + ": " + e.message);
+      }
+    }
+    return result;
+  }
+
+  /* publish one local course pack into the shared GitHub folder */
+  async function syncPushPack(pack) {
+    var cfg = syncConfig();
+    if (!cfg.token) throw new Error("No GitHub token configured for sync");
+    var name = pack.packageId + ".iebpack.json";
+    await syncUploadPack(cfg, name, pack);
+    syncRegistrySet(pack.packageId, {
+      remotePath: cfg.folder + "/" + name,
+      revision: pack.revision || 1, fingerprint: pack.fingerprint, name: name
+    });
+    return { name: name };
+  }
+
+  /* expose the sync API on the global object (browsers) and via exports */
+  function module_exports_sync() { return {
+    DEFAULTS: SYNC_DEFAULTS, config: syncConfig, saveConfig: saveSyncConfig,
+    listPacks: syncListPacks, downloadPack: syncDownloadPack, uploadPack: syncUploadPack,
+    pull: syncPull, pushPack: syncPushPack,
+    registry: syncRegistry, registrySet: syncRegistrySet,
+    listInstalled: listInstalledPacks, installPack: installPack };
+  }
+  if (typeof window !== "undefined") window.IEB_SYNC = module_exports_sync();
+
   return {
     FORMAT_VERSION: FORMAT_VERSION,
     TASK_TYPES: TASK_TYPES, TYPE_IDS: TYPE_IDS, MEDIA_ICONS: MEDIA_ICONS,
@@ -608,6 +893,11 @@
     validateTask: validateTask, validateBook: validateBook, validateManifest: validateManifest,
     buildPack: buildPack, readPack: readPack,
     packFingerprint: packFingerprint, decidePackAction: decidePackAction, mergeBooks: mergeBooks,
-    starterDraft: starterDraft
+    starterDraft: starterDraft,
+    SYNC_DEFAULTS: SYNC_DEFAULTS, syncConfig: syncConfig, saveSyncConfig: saveSyncConfig,
+    syncRawUrl: rawUrl, syncApiBase: apiBase, ghFetch: ghFetch,
+    syncListPacks: syncListPacks, syncDownloadPack: syncDownloadPack, syncUploadPack: syncUploadPack,
+    syncRegistry: syncRegistry, syncRegistrySet: syncRegistrySet, syncPull: syncPull,
+    syncPushPack: syncPushPack, sync: module_exports_sync()
   };
 });
