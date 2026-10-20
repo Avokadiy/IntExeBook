@@ -625,13 +625,20 @@
   function syncConfig() {
     try {
       var c = JSON.parse(syncStorage().getItem("ieb-sync-config") || "{}");
-      return {
+      var cfg = {
         owner: c.owner || SYNC_DEFAULTS.owner,
         repo: c.repo || SYNC_DEFAULTS.repo,
         branch: c.branch || SYNC_DEFAULTS.branch,
         folder: c.folder || SYNC_DEFAULTS.folder,
         token: c.token || ""
       };
+      /* convenience fallback: the same token the “🔄 Update” button was given
+         can also live in localStorage["ieb-github-token"] — Publish/Update
+         pick it up automatically so teachers only paste it once */
+      if (!cfg.token) {
+        try { cfg.token = syncStorage().getItem("ieb-github-token") || ""; } catch (e2) {}
+      }
+      return cfg;
     } catch (e) { return Object.assign({}, SYNC_DEFAULTS); }
   }
 

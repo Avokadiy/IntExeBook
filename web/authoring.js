@@ -38,6 +38,7 @@
   const taskCache = A.taskCache;
 
   const LS_DRAFTS = "ieb-drafts";      // file:// fallback storage
+  const LS_PUBLISH_META = "ieb-publish-meta"; // draftName -> {packageId, revision}
   const MAX_ASSET = 12 * 1024 * 1024;  // 12 MB per media file in the browser
 
   /* ------------------------------------------------------ tiny DOM helpers */
@@ -110,6 +111,20 @@
   function lsDelDraft(name) {
     const d = lsDrafts(); delete d[name];
     try { localStorage.setItem(LS_DRAFTS, JSON.stringify(d)); } catch (e) { /* ignore */ }
+  }
+
+  /* Remember the passport of a published draft so re-publishing the same
+     course bumps revision and reuses packageId instead of creating a copy. */
+  function lsPublishMeta(name) {
+    try { return JSON.parse(localStorage.getItem(LS_PUBLISH_META) || "{}")[name] || null; }
+    catch (e) { return null; }
+  }
+  function lsSetPublishMeta(name, meta) {
+    try {
+      const all = JSON.parse(localStorage.getItem(LS_PUBLISH_META) || "{}");
+      all[name] = meta;
+      localStorage.setItem(LS_PUBLISH_META, JSON.stringify(all));
+    } catch (e) { /* ignore */ }
   }
 
   async function api(method, url, body) {
@@ -235,11 +250,13 @@
     if (!drafts.length) { list.innerHTML = `<div class="meta" style="color:var(--muted)">No drafts yet — they are saved automatically while you edit.</div>`; return; }
     list.innerHTML = "";
     drafts.forEach(d => {
+      const pubMeta = lsPublishMeta(d.name);
       const row = h("div", { class: "lesson-row" }, [
         h("div", null, [
-          h("strong", { style: "font-size:16px" }, d.title),
+          h("strong", { style: "font-size:16px" }, d.title + (pubMeta ? "  ✓ published (rev " + (pubMeta.revision || 1) + ")" : "")),
           h("div", { class: "meta" }, (d.updated ? d.updated.replace("T", " ").slice(0, 16) : "") +
-            (d.stats && d.stats.tasks != null ? " · " + d.stats.tasks + " task(s)" : "")),
+            (d.stats && d.stats.tasks != null ? " · " + d.stats.tasks + " task(s)" : "") +
+            (pubMeta ? " · re-publishing sends an UPDATE to colleagues, not a copy" : "")),
         ]),
         h("div", { style: "display:flex;gap:8px" }, [
           rowBtn("Open", () => openDraft(d.name)),
@@ -648,6 +665,14 @@
      AND writes <course>.iebpack.json next to it — a single file that can be
      sent to anyone (chat / e-mail / USB). They import it and the course shows
      up in their library with the author's name. */
+  /* Publish = get the course out to colleagues. Three destinations, tried in
+     order of convenience:
+       1. GitHub shared-exercises/ hub (needs the sync token — right-click the
+          “🔄 Update” button in the header to set it). Colleagues get it with
+          one click on “Update”.
+       2. local server folder shared-exercises/ (when server.py runs).
+       3. plain .iebpack.json download (file:// mode or no permissions) —
+          send the single file by chat / e-mail / USB. */
   async function publishCourse() {
     if (!session) return;
     const built = buildSavePayload();
@@ -662,27 +687,87 @@
       // editing an installed book → publishing makes a standalone shared copy
       manifest.id = S.slugify(manifest.title || "course") + "-shared";
     }
-    if (FILE_MODE) {
-      downloadPackFor(null, null, { manifest, books: built.payload.books, assets: session.assets });
-      toast("Server is not running — downloaded the pack file instead. Start server.py to publish into shared-exercises/.", "warn");
+    const packObj = S.buildPack({ manifest: manifest, books: built.payload.books, assets: session.assets });
+
+    /* ---- passport continuity: re-publishing the same course keeps its
+       packageId and bumps revision -> colleagues get an UPDATE, not a copy.
+       The draft is kept after publishing (marked published) so that editing +
+       re-publishing stays a versioned update of the SAME package. */
+    const prevMeta = lsPublishMeta(session.draftName);
+    if (prevMeta && prevMeta.packageId) {
+      packObj.packageId = prevMeta.packageId;
+      packObj.revision = (prevMeta.revision || 1) + 1;
+    } else {
+      lsSetPublishMeta(session.draftName, { packageId: packObj.packageId, revision: packObj.revision, title: manifest.title });
+    }
+    const rememberPublished = () => lsSetPublishMeta(session.draftName, { packageId: packObj.packageId, revision: packObj.revision, title: manifest.title });
+
+    /* ---- destination 1: GitHub hub (works even in file:// mode) ---- */
+    const cfg = window.IEB_SYNC ? window.IEB_SYNC.config() : null;
+    if (cfg && cfg.token && window.IEB_SYNC) {
+      const doPush = async () => {
+        try {
+          const r = await window.IEB_SYNC.pushPack(packObj);
+          invalidateCaches();
+          if (session) { session.publishedTo = r.name; }
+          rememberPublished();
+          openModal(modal("📦 Published to the shared hub!", [
+            h("p", null, ["Course ", h("strong", null, "“" + (manifest.title || packObj.packageId) + "”"), " rev ", String(packObj.revision), " is now visible to every teacher who presses “🔄 Update”."]),
+            h("div", { class: "ed-path" }, "https://github.com/" + cfg.owner + "/" + cfg.repo + "/tree/" + cfg.branch + "/" + cfg.folder + "/"),
+            h("h4", null, "Share it directly too"),
+            h("p", { class: "ed-help" }, "Prefer a private copy? Send this single file by chat / e-mail — the colleague opens it via “Import pack”."),
+            h("p", { class: "ed-help" }, "The draft stays in “My drafts” — edit it and press Publish again to release revision " + (packObj.revision + 1) + "."),
+          ], [
+            btn("⬇ Download pack file", "btn-primary", () => download(packObj.packageId + ".iebpack.json", JSON.stringify(packObj))),
+            btn("Close", "btn-ghost", closeModal),
+          ]));
+        } catch (e) {
+          const m = String(e.message || e);
+          if (/401|403|Bad credentials/i.test(m)) {
+            toast("GitHub rejected the token — right-click “🔄 Update” to change it, then press Publish again.", "bad");
+          } else {
+            toast("Publish to GitHub failed: " + m + " — downloaded the pack file instead.", "warn");
+            download(packObj.packageId + ".iebpack.json", JSON.stringify(packObj));
+          }
+        }
+      };
+      if (packObj.revision > 1) {
+        if (!confirm("Re-publish “" + (manifest.title || "") + "” as revision " + packObj.revision + "?\nColleagues who already have it will get an UPDATE, not a copy.")) return;
+      }
+      await doPush();
       return;
     }
-    try {
-      const res = await api("POST", "/api/publish", { manifest, books: built.payload.books, assets: session.assets });
-      invalidateCaches();
-      if (session) { session.publishedTo = res.folder; lsDelDraft(session.draftName); }
-      openModal(modal("📦 Published!", [
-        h("p", null, ["Course ", h("strong", null, "“" + res.title + "”"), " is now in your library and saved as a shareable package:"]),
-        h("div", { class: "ed-path" }, "shared-exercises/" + res.folder + "/"),
-        h("p", { class: "ed-help" }, "The whole folder can be copied to a colleague as-is, but the easiest way is the single pack file:"),
-        h("div", { class: "ed-path" }, "shared-exercises/" + res.pack_name),
-        h("p", { class: "ed-help" }, "Send that one file by chat / e-mail / flash drive — your colleague opens it via “Import pack”."),
-      ], [
-        btn("⬇ Download pack file", "btn-primary", () => { location.href = API(res.pack_url); }),
-        btn("Open course", "btn-ghost", () => { closeModal(); location.hash = "#/tb/" + encodeURIComponent(res.folder); }),
-        btn("Close", "btn-ghost", closeModal),
-      ]));
-    } catch (e) { toast("Publish failed: " + e.message, "bad"); }
+
+    /* ---- destination 2: local server folder ---- */
+    if (!FILE_MODE) {
+      try {
+        const res = await api("POST", "/api/publish", { manifest, books: built.payload.books, assets: session.assets });
+        invalidateCaches();
+        if (session) { session.publishedTo = res.folder; }
+        rememberPublished();
+        openModal(modal("📦 Published!", [
+          h("p", null, ["Course ", h("strong", null, "“" + res.title + "”"), " is now in your library and saved as a shareable package:"]),
+          h("div", { class: "ed-path" }, "shared-exercises/" + res.folder + "/"),
+          h("p", { class: "ed-help" }, "The whole folder can be copied to a colleague as-is, but the easiest way is the single pack file:"),
+          h("div", { class: "ed-path" }, "shared-exercises/" + res.pack_name),
+          h("p", { class: "ed-help" }, "Send that one file by chat / e-mail / flash drive — your colleague opens it via “Import pack”."),
+          h("p", { class: "ed-help" }, "Tip: set the GitHub token once (right-click the “🔄 Update” button) and Publish will go straight to the shared hub for everyone."),
+        ], [
+          btn("⬇ Download pack file", "btn-primary", () => { location.href = API(res.pack_url); }),
+          btn("Open course", "btn-ghost", () => { closeModal(); location.hash = "#/tb/" + encodeURIComponent(res.folder); }),
+          btn("Close", "btn-ghost", closeModal),
+        ]));
+        return;
+      } catch (e) {
+        toast("Local publish failed (" + e.message + ") — downloading the pack file instead.", "warn");
+        download(packObj.packageId + ".iebpack.json", JSON.stringify(packObj));
+        return;
+      }
+    }
+
+    /* ---- destination 3: plain file download ---- */
+    download(packObj.packageId + ".iebpack.json", JSON.stringify(packObj));
+    toast("No GitHub token set — downloaded the pack file. Set the token (right-click “🔄 Update”) so Publish goes to the shared hub automatically.", "warn");
   }
 
   /* download (or build locally) the .iebpack.json for a published course */
