@@ -822,6 +822,24 @@
      actually change?" question we compare CONTENT instead: a normalized
      digest of units/lessons/tasks that both sides can build from their own
      copy of the pack. */
+  /* IMPORTANT: the digest must be stable across app restarts and across
+     machines, so it deliberately EXCLUDES volatile fields (timestamps like
+     createdAt/publishedAt, revision numbers, author-change metadata). Only
+     real exercise content + core meta feed into it. */
+  var DIGEST_SKIP_KEYS = {
+    createdAt: 1, updatedAt: 1, publishedAt: 1, importedAt: 1, syncedAt: 1,
+    revision: 1, fingerprint: 1, packageId: 1, _passport: 1, contributors: 1,
+    lastEditor: 1, editedAt: 1, mergedFrom: 1, mergeHistory: 1, history: 1,
+    localModified: 1, authorKey: 1
+  };
+  function canonicalStable(value, depth) {
+    depth = depth || 0;
+    if (depth > 24) return "?";
+    if (value === null || typeof value !== "object") return JSON.stringify(value);
+    if (Array.isArray(value)) return "[" + value.map(function (v) { return canonicalStable(v, depth + 1); }).join(",") + "]";
+    var keys = Object.keys(value).filter(function (k) { return !DIGEST_SKIP_KEYS[k]; }).sort();
+    return "{" + keys.map(function (k) { return JSON.stringify(k) + ":" + canonicalStable(value[k], depth + 1); }).join(",") + "}";
+  }
   function contentDigest(packObj) {
     var books = (packObj && packObj.books) || {};
     var parts = [];
@@ -831,7 +849,7 @@
       (book.units || []).forEach(function (u) {
         (u.lessons || []).forEach(function (l) {
           (l.tasks || []).forEach(function (t) {
-            parts.push(u.id + "/" + l.id + "/" + t.id + ":" + canonical(t));
+            parts.push(u.id + "/" + l.id + "/" + t.id + ":" + canonicalStable(t));
           });
         });
       });
@@ -914,22 +932,47 @@
     }
     result.offline = !!listed.offline;
     if (listed.note) result.note = listed.note;
+    var reg0 = syncRegistry();
     var installed = await listInstalledPacks();
     for (var i = 0; i < listed.packs.length; i++) {
       var p = listed.packs[i];
       if (onProgress) onProgress(i + 1, listed.packs.length, p.name);
       try {
+        /* ZERO-COPY GUARANTEE: if this exact file was already pulled into a
+           course on THIS machine before (even in an earlier browser session),
+           never touch it again. The old code re-downloaded and re-installed
+           packs whose registry entry lacked a content hash — that is what
+           created duplicate courses after every app restart. */
+        var reg = syncRegistry();
+        var pidGuess = /\.iebpack\.json$/i.test(p.name) ? p.name.replace(/\.iebpack\.json$/i, "") : null;
+        var knownReg = reg[pidGuess] || null;
+        var seenPath = knownReg && knownReg.remotePath === p.path;
+        if (seenPath && !knownReg.localModified) {
+          result.skipped.push(p.name);
+          continue;
+        }
         var pack = await syncDownloadPack(cfg, p.path);
+        if (!knownReg && pack.packageId) {
+          knownReg = reg[pack.packageId] || null;
+          seenPath = knownReg && knownReg.remotePath === p.path;
+          if (seenPath && !knownReg.localModified) { result.skipped.push(p.name); continue; }
+        }
         /* FIRST: compare against the exact copy we installed/published last
            time. If the exercise content is byte-for-byte equivalent there is
            nothing to do — this stops your own course from re-downloading on
            every Update press (and survives client/server hash mismatch). */
         if (packContentChanged(pack) === false) {
+          if (knownReg) syncRegistrySet(pack.packageId, Object.assign({}, knownReg, { remotePath: p.path, revision: pack.revision || 1 }));
+          else rememberPackContent(pack), syncRegistrySet(pack.packageId, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name });
           result.skipped.push(p.name);
           continue;
         }
         var decision = decidePackAction(pack, installed);
-        if (decision.action === "duplicate") { result.skipped.push(p.name); continue; }
+        if (decision.action === "duplicate") {
+          rememberPackContent(pack);
+          syncRegistrySet(pack.packageId, Object.assign({}, syncRegistry()[pack.packageId] || {}, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name }));
+          result.skipped.push(p.name); continue;
+        }
         var install = await installPack(pack, decision);
         rememberPackContent(pack);
         syncRegistrySet(pack.packageId, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name });
