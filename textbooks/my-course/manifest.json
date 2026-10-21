@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "id": "my-course",
+  "title": "pipo 1",
+  "color": "#6366f1",
+  "icon": "✨",
+  "description": "Created with the IntExeBook exercise builder.",
+  "created": "2026-10-21",
+  "packageId": "pkg-96ceafa6930eb752",
+  "revision": 2,
+  "fingerprint": "c5ba40c177c1a101",
+  "contributors": [
+    "unknown"
+  ],
+  "localModified": true,
+  "student": "Student's Book"
+}
