@@ -1636,9 +1636,15 @@ def scan_textbooks() -> list[dict]:
                 with open(os.path.join(SHARED_DIR, entry), encoding="utf-8") as fh:
                     pk = json.load(fh)
                 mf = pk.get("manifest") or {}
+                books_data = pk.get("books") or {}
                 books = [{"slot": s, "label": mf.get(s) or lbl}
                          for s, lbl in (("student", "Student's Book"), ("workbook", "Workbook"))
-                         if (pk.get("books") or {}).get(s)]
+                         if books_data.get(s)]
+                # compute our OWN fingerprint over the pack content — never
+                # trust the one stored inside the file. The client-side and
+                # server-side hash algorithms differ, so trusting the embedded
+                # value made every sync re-download even your own course.
+                fp = pack_fingerprint(mf, books_data, pk.get("assets") or {})
                 cards.append({
                     "folder": entry, "id": mf.get("id") or entry[: -len(PACK_EXT)],
                     "title": mf.get("title") or entry,
@@ -1649,6 +1655,7 @@ def scan_textbooks() -> list[dict]:
                     "source": "shared-pack",
                     "packageId": pk.get("packageId"),
                     "revision": pk.get("revision", 1),
+                    "fingerprint": fp,
                     "books": books,
                 })
             except Exception:
@@ -1698,7 +1705,27 @@ def installed_packs() -> list[dict]:
             pkg = c.get("packageId") or mf.get("packageId")
             if not pkg:
                 continue
-            fp = mf.get("fingerprint") or c.get("fingerprint") or ""
+            # for flat shared packs the card already carries a freshly
+            # computed fingerprint; for installed folders prefer the stored
+            # manifest one, falling back to recomputation from disk content
+            fp = c.get("fingerprint") or mf.get("fingerprint") or ""
+            if not fp and c.get("source") != "shared-pack":
+                try:
+                    folder_path = os.path.join(TEXTBOOKS_DIR, c.get("folder") or "")
+                    books_now = {}
+                    for slot in ("student", "workbook"):
+                        bpath = os.path.join(folder_path, slot + ".json")
+                        if os.path.isfile(bpath):
+                            with open(bpath, encoding="utf-8") as fh:
+                                books_now[slot] = json.load(fh)
+                    assets_now = {}
+                    adir = os.path.join(folder_path, "assets")
+                    if os.path.isdir(adir):
+                        for fn in os.listdir(adir):
+                            assets_now[fn] = True
+                    fp = pack_fingerprint(mf, books_now, assets_now)
+                except Exception:
+                    fp = ""
             rev = int(mf.get("revision") or c.get("revision") or 1)
             entry = {
                 "packageId": pkg,

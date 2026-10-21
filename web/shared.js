@@ -816,6 +816,56 @@
     });
   }
 
+  /* -------------------------------------------------- content comparison
+     The client and server compute fingerprints with different hash
+     algorithms, so cross-comparing them always fails. For the "did anything
+     actually change?" question we compare CONTENT instead: a normalized
+     digest of units/lessons/tasks that both sides can build from their own
+     copy of the pack. */
+  function contentDigest(packObj) {
+    var books = (packObj && packObj.books) || {};
+    var parts = [];
+    ["student", "workbook"].forEach(function (slot) {
+      var book = books[slot];
+      if (!book) return;
+      (book.units || []).forEach(function (u) {
+        (u.lessons || []).forEach(function (l) {
+          (l.tasks || []).forEach(function (t) {
+            parts.push(u.id + "/" + l.id + "/" + t.id + ":" + canonical(t));
+          });
+        });
+      });
+    });
+    var m = (packObj && packObj.manifest) || {};
+    parts.push("meta:" + (m.title || "") + "|" + (m.author || "") + "|" + (m.level || ""));
+    var assetNames = Object.keys((packObj && packObj.assets) || {}).sort();
+    for (var ai = 0; ai < assetNames.length; ai++) parts.push("asset:" + assetNames[ai]);
+    return fnv1a(parts.join("\n"));
+  }
+
+  /* Compare an incoming remote pack against the local copy we installed or
+     published before (stored in the sync registry). Returns true only when
+     the actual exercise content differs — revisions alone are not enough,
+     because re-publishing an unchanged course bumps the revision number. */
+  function packContentChanged(packObj) {
+    var reg = syncRegistry();
+    var rec = packObj && packObj.packageId ? reg[packObj.packageId] : null;
+    if (!rec || !rec.contentHash) return null; // nothing to compare against
+    return rec.contentHash !== contentDigest(packObj);
+  }
+
+  function rememberPackContent(packObj) {
+    if (!packObj || !packObj.packageId) return;
+    var reg = syncRegistry();
+    var rec = reg[packObj.packageId] || {};
+    rec.contentHash = contentDigest(packObj);
+    rec.remotePath = rec.remotePath || null;
+    rec.revision = packObj.revision || rec.revision || 1;
+    rec.fingerprint = packObj.fingerprint || rec.fingerprint || null;
+    rec.name = (packObj.manifest && packObj.manifest.title) || rec.name || packObj.packageId;
+    syncRegistrySet(packObj.packageId, rec);
+  }
+
   /* install one downloaded pack through the local backend (server mode);
      in file:// mode there is no backend, so we remember it locally and hand
      the JSON back to the caller to offer a .iebpack download instead. */
@@ -870,9 +920,18 @@
       if (onProgress) onProgress(i + 1, listed.packs.length, p.name);
       try {
         var pack = await syncDownloadPack(cfg, p.path);
+        /* FIRST: compare against the exact copy we installed/published last
+           time. If the exercise content is byte-for-byte equivalent there is
+           nothing to do — this stops your own course from re-downloading on
+           every Update press (and survives client/server hash mismatch). */
+        if (packContentChanged(pack) === false) {
+          result.skipped.push(p.name);
+          continue;
+        }
         var decision = decidePackAction(pack, installed);
         if (decision.action === "duplicate") { result.skipped.push(p.name); continue; }
         var install = await installPack(pack, decision);
+        rememberPackContent(pack);
         syncRegistrySet(pack.packageId, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name });
         installed = await listInstalledPacks();   // keep the view fresh for later files
         var act = install.action || decision.action;
@@ -890,8 +949,28 @@
   async function syncPushPack(pack) {
     var cfg = syncConfig();
     if (!cfg.token) throw new Error("No GitHub token configured for sync");
+    /* If the exact same content is already in the hub, don't push a new
+       revision — re-publishing an unchanged course used to make every peer
+       (and yourself) "update" on the next sync for no reason. */
     var name = pack.packageId + ".iebpack.json";
+    try {
+      var listed = await syncListPacks(cfg);
+      var mine = null;
+      (listed.packs || []).forEach(function (p) { if (p.name === name) mine = p; });
+      if (mine) {
+        var remote = await syncDownloadPack(cfg, mine.path);
+        if (canonical(remote.books || {}) === canonical(pack.books || {}) &&
+            canonical((remote.manifest || {}).title) === canonical((pack.manifest || {}).title)) {
+          rememberPackContent(pack);
+          syncRegistrySet(pack.packageId, { remotePath: cfg.folder + "/" + name,
+            revision: remote.revision || pack.revision || 1,
+            fingerprint: pack.fingerprint, name: name });
+          return { name: name, unchanged: true };
+        }
+      }
+    } catch (e) { /* listing failed -> just push normally */ }
     await syncUploadPack(cfg, name, pack);
+    rememberPackContent(pack);
     syncRegistrySet(pack.packageId, {
       remotePath: cfg.folder + "/" + name,
       revision: pack.revision || 1, fingerprint: pack.fingerprint, name: name
@@ -905,6 +984,8 @@
     listPacks: syncListPacks, downloadPack: syncDownloadPack, uploadPack: syncUploadPack,
     pull: syncPull, pushPack: syncPushPack,
     registry: syncRegistry, registrySet: syncRegistrySet,
+    contentDigest: contentDigest, packContentChanged: packContentChanged,
+    rememberPackContent: rememberPackContent,
     listInstalled: listInstalledPacks, installPack: installPack };
   }
   if (typeof window !== "undefined") window.IEB_SYNC = module_exports_sync();

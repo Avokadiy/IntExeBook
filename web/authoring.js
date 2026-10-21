@@ -700,6 +700,26 @@
     } else {
       lsSetPublishMeta(session.draftName, { packageId: packObj.packageId, revision: packObj.revision, title: manifest.title });
     }
+    /* ---- passport from the sync registry too: when a teacher edits a
+       course that was installed via "🔄 Update" (no draft meta for it),
+       reuse its packageId so publishing UPDATES the hub instead of
+       creating a second copy with the same content. */
+    if (window.IEB_SYNC && (!prevMeta || !prevMeta.packageId)) {
+      try {
+        const reg = window.IEB_SYNC.registry();
+        Object.keys(reg).forEach(function (pid) {
+          const r = reg[pid];
+          const rTitle = (r.name || "").trim().toLowerCase();
+          const nTitle = (manifest.title || "").trim().toLowerCase();
+          if (!rTitle || !nTitle) return;
+          if (rTitle === nTitle || rTitle === session.draftName.toLowerCase()) {
+            packObj.packageId = pid;
+            packObj.revision = Math.max(packObj.revision, (r.revision || 1) + 1);
+            lsSetPublishMeta(session.draftName, { packageId: pid, revision: packObj.revision, title: manifest.title });
+          }
+        });
+      } catch (e) { /* registry unreadable -> keep fresh packageId */ }
+    }
     const rememberPublished = () => lsSetPublishMeta(session.draftName, { packageId: packObj.packageId, revision: packObj.revision, title: manifest.title });
 
     /* ---- destination 1: GitHub hub (works even in file:// mode) ---- */
@@ -711,8 +731,9 @@
           invalidateCaches();
           if (session) { session.publishedTo = r.name; }
           rememberPublished();
-          openModal(modal("📦 Published to the shared hub!", [
-            h("p", null, ["Course ", h("strong", null, "“" + (manifest.title || packObj.packageId) + "”"), " rev ", String(packObj.revision), " is now visible to every teacher who presses “🔄 Update”."]),
+          openModal(modal(r.unchanged ? "📦 Course is already up to date in the shared hub" : "📦 Published to the shared hub!", [
+            h("p", null, ["Course ", h("strong", null, "“" + (manifest.title || packObj.packageId) + "”"), " rev ", String(packObj.revision),
+              r.unchanged ? " has not changed since your last publish — nothing new was uploaded." : " is now visible to every teacher who presses “🔄 Update”."]),
             h("div", { class: "ed-path" }, "https://github.com/" + cfg.owner + "/" + cfg.repo + "/tree/" + cfg.branch + "/" + cfg.folder + "/"),
             h("h4", null, "Share it directly too"),
             h("p", { class: "ed-help" }, "Prefer a private copy? Send this single file by chat / e-mail — the colleague opens it via “Import pack”."),
