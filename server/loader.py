@@ -913,6 +913,25 @@ def read_pack(pack: dict) -> dict:
     }
 
 
+def iter_textbook_folders() -> list[str]:
+    """All textbook folders (and extracted archives) under TEXTBOOKS_DIR and
+    SHARED_DIR — used by passport lookups so a course can be found wherever
+    it lives (library or shared hub)."""
+    out: list[str] = []
+    for base in (TEXTBOOKS_DIR, SHARED_DIR):
+        if not os.path.isdir(base):
+            continue
+        for entry in sorted(os.listdir(base)):
+            if entry.startswith("_") or entry.startswith("."):
+                continue
+            full = os.path.join(base, entry)
+            if os.path.isdir(full):
+                out.append(full)
+            elif entry.lower().endswith((".zip", ".tar", ".tar.gz", ".tgz")):
+                out.append(full)  # archives are resolved lazily via _ensure_folder
+    return out
+
+
 def find_installed_by_package(package_id: str) -> Optional[dict]:
     """Look through installed courses + published ones for a packageId."""
     if not package_id:
