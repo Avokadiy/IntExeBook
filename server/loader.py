@@ -42,6 +42,7 @@ import hashlib
 import json
 import os
 import shutil
+import time
 import tarfile
 import tempfile
 import urllib.parse
@@ -1295,6 +1296,139 @@ def import_pack(pack: dict, new_id: Optional[str] = None) -> dict:
     res = create_textbook(payload)
     res.update({"action": "install", "packageId": package_id, "revision": info["revision"]})
     return res
+
+
+# ------------------------------------------------------------- hub admin
+def list_hub_packs() -> list:
+    """Every flat .iebpack.json sitting in shared-exercises/ (the course hub).
+
+    Returns lightweight cards for the admin panel — title, level, author,
+    passport fields and file size. Broken files are skipped silently so one
+    corrupt pack cannot hide the whole hub from its owner.
+    """
+    out: list = []
+    if not os.path.isdir(SHARED_DIR):
+        return out
+    for entry in sorted(os.listdir(SHARED_DIR)):
+        if not entry.endswith(PACK_EXT):
+            continue
+        path = os.path.join(SHARED_DIR, entry)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                pk = json.load(fh)
+            mf = pk.get("manifest") or {}
+            books_data = pk.get("books") or {}
+            units = (books_data.get("student") or {}).get("units") or \
+                    (books_data.get("workbook") or {}).get("units") or []
+            tasks = sum(len(l.get("tasks") or [])
+                        for u in units for l in (u.get("lessons") or []))
+            out.append({
+                "file": entry,
+                "id": mf.get("id") or entry[: -len(PACK_EXT)],
+                "title": mf.get("title") or entry,
+                "level": mf.get("level", ""),
+                "author": mf.get("author", ""),
+                "description": mf.get("description", ""),
+                "packageId": pk.get("packageId") or mf.get("packageId") or "",
+                "revision": int(pk.get("revision") or mf.get("revision") or 1),
+                "slots": [s for s in ("student", "workbook") if books_data.get(s)],
+                "units": len(units),
+                "tasks": tasks,
+                "bytes": os.path.getsize(path),
+                "updated": time.strftime("%Y-%m-%d %H:%M",
+                                         time.localtime(os.path.getmtime(path))),
+            })
+        except Exception:
+            continue
+    return out
+
+
+def read_hub_pack(fname: str) -> dict:
+    """Load one hub pack by file name with strict path checks."""
+    base = os.path.basename(str(fname or ""))
+    if not base.endswith(PACK_EXT):
+        raise TextbookError("not a pack file name")
+    path = _safe_join(SHARED_DIR, base)
+    if not os.path.isfile(path):
+        raise TextbookError("hub pack not found: " + base)
+    with open(path, encoding="utf-8") as fh:
+        try:
+            pk = json.load(fh)
+        except Exception:
+            raise TextbookError("hub pack is not valid JSON: " + base)
+    if not isinstance(pk, dict) or pk.get("format") != "ieb-pack":
+        raise TextbookError("this file is not an IntExeBook pack")
+    return pk
+
+
+def delete_hub_pack(fname: str) -> bool:
+    """Remove one published course file from the hub (admin panel)."""
+    base = os.path.basename(str(fname or ""))
+    if not base.endswith(PACK_EXT):
+        raise TextbookError("not a pack file name")
+    path = _safe_join(SHARED_DIR, base)
+    if not os.path.isfile(path):
+        return False
+    os.remove(path)
+    invalidate_cache()
+    return True
+
+
+def save_hub_pack(fname: str, pack: dict) -> dict:
+    """Validate and overwrite an existing hub pack (admin edit flow).
+
+    The edited copy keeps the original passport (packageId / revision) so
+    teachers who already installed the course get a normal UPDATE on their
+    next sync instead of a duplicate. The stored fingerprint is recomputed
+    server-side; readers never trust the value embedded in the file anyway.
+    """
+    if not isinstance(pack, dict) or pack.get("format") != "ieb-pack":
+        raise TextbookError("edited payload is not an IntExeBook pack")
+    old = read_hub_pack(fname)
+    mf = validate_manifest(pack.get("manifest"))
+    if not mf["ok"]:
+        raise TextbookError("; ".join(mf["errors"]))
+    manifest = mf["value"]
+    books_raw = pack.get("books") or {}
+    books: dict = {}
+    errs: list = []
+    for slot in ("student", "workbook"):
+        if not books_raw.get(slot):
+            continue
+        vb = validate_book(books_raw[slot])
+        errs.extend("%s: %s" % (slot, e) for e in vb["errors"][:6])
+        books[slot] = vb["value"]
+    if errs:
+        raise TextbookError("; ".join(errs[:8]))
+    if not books:
+        raise TextbookError("nothing to save — the course has no content")
+    # keep the identity of the published course stable
+    manifest["packageId"] = (old.get("packageId")
+                             or (old.get("manifest") or {}).get("packageId")
+                             or manifest.get("packageId") or new_package_id())
+    try:
+        manifest["revision"] = max(1, int(old.get("revision") or 1))
+    except (TypeError, ValueError):
+        manifest["revision"] = 1
+    assets = pack.get("assets") if isinstance(pack.get("assets"), dict) else (old.get("assets") or {})
+    out = {"format": "ieb-pack", "version": 1,
+           "generator": "IntExeBook admin panel",
+           "exported": __import__("datetime").datetime.now().isoformat(),
+           "packageId": manifest["packageId"],
+           "revision": manifest["revision"],
+           "fingerprint": pack_fingerprint(manifest, books, assets),
+           "manifest": manifest, "books": books, "assets": assets}
+    base = os.path.basename(str(fname or ""))
+    path = _safe_join(SHARED_DIR, base)
+    if not os.path.isfile(path):
+        raise TextbookError("hub pack not found: " + base)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
+        json.dump(out, fh, ensure_ascii=False)
+    os.replace(tmp, path)
+    invalidate_cache()
+    return {"ok": True, "file": base, "packageId": manifest["packageId"],
+            "revision": manifest["revision"]}
 
 
 # ------------------------------------------------------- multi-teacher merge

@@ -317,6 +317,29 @@
   }
   /* ============================================================ #/import */
   function renderImport() {
+    /* ---- admin hub flow (web/admin.js): open a published course straight
+       into the editor instead of showing the file-drop page. The pack was
+       fetched by the panel and parked on window.__iebAdminPack; the hub
+       passport travels with the session so saving keeps packageId/revision. */
+    const admin = window.IEB_ADMIN;
+    if (admin && admin.hubMode && admin.hubMode !== "new" && window.__iebAdminPack) {
+      const pk = window.__iebAdminPack;
+      window.__iebAdminPack = null;               // consume once
+      const chk = S.readPack(pk);
+      if (!chk.ok) { toast("Hub pack is broken: " + chk.errors.join("; "), "bad"); location.hash = "#/admin"; return; }
+      const slot0 = Object.keys(chk.books)[0] || "student";
+      startSession({
+        target: { mode: "standalone" },
+        manifest: chk.manifest,
+        slot: slot0,
+        book: chk.books[slot0],
+        assets: chk.assets || {},
+        hubFile: admin.hubMode.file,
+        hubPackageId: admin.hubMode.packageId || pk.packageId,
+        hubRevision: admin.hubMode.revision || pk.revision || 1,
+      });
+      return;
+    }
     renderCrumbs([{ label: "🏠 Textbooks", href: "#/" }, { label: "📥 Import pack" }]);
     app.innerHTML = `
       <section>
@@ -526,6 +549,9 @@
       book: payload.book,
       assets: payload.assets || {},     // rel -> dataURL (pending uploads)
       dirty: false,
+      hubFile: payload.hubFile || null,  // admin panel: .iebpack.json being edited in the hub
+      hubPackageId: payload.hubPackageId || null,
+      hubRevision: payload.hubRevision || null,
     };
     if (!session.draftName) {
       session.draftName = "draft-" + S.slugify(session.manifest.title || "course") + "-" + Date.now().toString(36).slice(-4);
@@ -675,6 +701,42 @@
           send the single file by chat / e-mail / USB. */
   async function publishCourse() {
     if (!session) return;
+
+    /* ---- ADMIN HUB MODE (founder panel, web/admin.js): write the course
+       straight back into shared-exercises/ — through the GitHub hub branch
+       when a sync token is configured, otherwise through the guarded local
+       /api/admin/hub endpoints. Keeps the original packageId so teachers
+       receive an UPDATE on their next sync instead of a duplicate. ---- */
+    const admin = window.IEB_ADMIN;
+    if (admin && admin.hubMode && typeof admin.hubPublish === "function") {
+      const builtHub = buildSavePayload();
+      if (builtHub.errors) {
+        toast("Please fix " + builtHub.errors.length + " problem(s) first", "bad");
+        showValidation(builtHub.errors, []);
+        return;
+      }
+      const manifestH = Object.assign({}, session.manifest);
+      manifestH[session.slot] = manifestH[session.slot] || slotLabel(session.slot);
+      const packHub = S.buildPack({ manifest: manifestH, books: builtHub.payload.books, assets: session.assets });
+      if (session.hubPackageId) packHub.packageId = session.hubPackageId;
+      if (session.hubRevision) packHub.revision = session.hubRevision;
+      let pushedToGitHub = false;
+      try {
+        const cfgH = window.IEB_SYNC ? window.IEB_SYNC.config() : null;
+        if (cfgH && cfgH.token && typeof window.IEB_SYNC.uploadPack === "function") {
+          await window.IEB_SYNC.uploadPack(packHub);   // commit into the shared-hub branch
+          pushedToGitHub = true;
+        }
+      } catch (e) {
+        toast("GitHub hub write failed (" + (e.message || e) + ") — saved locally via the server instead.", "warn");
+      }
+      const okHub = await admin.hubPublish(packHub);
+      if (okHub && pushedToGitHub) {
+        toast("Also pushed to the GitHub hub branch ✔", "ok");
+      }
+      return;
+    }
+
     const built = buildSavePayload();
     if (built.errors) {
       toast("Please fix " + built.errors.length + " problem(s) first", "bad");
@@ -939,13 +1001,14 @@
       h("div", { class: "ed-bar-left" }, [
         h("strong", null, "🛠 " + (session.manifest.title || "Untitled course")),
         h("span", { class: "ed-target-chip" }, t.icon + " " + t.title + " — " + t.sub),
+        session.hubFile ? h("span", { class: "ed-target-chip" }, "🛡 hub · " + session.hubFile) : null,
       ]),
       h("div", { class: "ed-bar-right" }, [
         h("span", { id: "edSaveState", class: "ed-state" }, "✓ autosaved"),
         btn("Course settings", "btn-ghost", editSettings),
         btn("Share / export", "btn-ghost", exportDialog),
         btn(session.inplace ? "💾 Save" : "💾 Save draft", "btn-ghost", () => saveSession(false)),
-        btn("📦 Publish & share", "btn-primary", publishCourse),
+        btn(session.hubFile ? "🛡 Save in hub" : "📦 Publish & share", "btn-primary", publishCourse),
       ]),
     ]);
 
@@ -1614,4 +1677,13 @@
   window.renderImport = renderImport;
   window.renderImportZip = renderImportZip;
   window.renderEditor = renderEditor;
+  window.IEB_AUTHORING = { startSession: startSession, buildPackFromSession: function () {
+    /* used by web/admin.js "New course" flow — returns the finished pack or null */
+    if (!session) return null;
+    const built = buildSavePayload();
+    if (built.errors) { showValidation(built.errors, []); return null; }
+    const manifest = Object.assign({}, session.manifest);
+    manifest[session.slot] = manifest[session.slot] || slotLabel(session.slot);
+    return S.buildPack({ manifest: manifest, books: built.payload.books, assets: session.assets });
+  } };
 })();

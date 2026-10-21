@@ -92,6 +92,11 @@ async function route() {
       throw new Error("The authoring module failed to load — check that shared.js and authoring.js are served correctly.");
   };
   try {
+    if (parts[0] === "admin") {
+      if (typeof window.renderAdmin !== "function")
+        throw new Error("The admin module failed to load — check that admin.js is served correctly.");
+      return window.renderAdmin();
+    }
     if (parts[0] === "create") { authoring(); return window.renderCreate(); }
     if (parts[0] === "import") { authoring(); return window.renderImport(); }
     if (parts[0] === "import-zip") { authoring(); return window.renderImportZip(); }
@@ -1371,9 +1376,24 @@ window.IEB_APP = {
         </div></div>
         <div class="ak-glitch" data-text="AKKAKI">AKKAKI</div>
         <div style="margin-top:14px;font-size:15px;letter-spacing:6px;text-transform:uppercase;background:linear-gradient(90deg,#818cf8,#c084fc,#f472b6,#818cf8);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:akFlow 2.5s linear infinite">founder mode engaged</div>
-        <div style="margin-top:16px;font-size:12px;opacity:.6">click anywhere to return to the library · press Konami again to hide the sparkle</div>
+        <div style="margin-top:16px;font-size:12px;opacity:.6">press Konami again to hide the sparkle</div>
+        <div style="margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button type="button" id="akEnterAdmin" style="cursor:pointer;border:1px solid rgba(167,139,250,.7);background:rgba(129,140,248,.18);color:#fff;font:inherit;padding:10px 18px;border-radius:10px;letter-spacing:1px">🛡 Enter admin panel</button>
+          <button type="button" id="akBackLib" style="cursor:pointer;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff;font:inherit;padding:10px 18px;border-radius:10px;opacity:.8">← Back to the library</button>
+        </div>
       </div>`;
     ov.addEventListener("click", exitFounder);
+    /* the founder overlay is also the door into the admin panel —
+       stopPropagation on the buttons so clicking them doesn't close it */
+    ov.querySelector("#akEnterAdmin").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      exitFounder();
+      location.hash = "#/admin";
+    });
+    ov.querySelector("#akBackLib").addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      exitFounder();
+    });
     const st = document.createElement("style");
     st.id = "ak-style";
     st.textContent = `

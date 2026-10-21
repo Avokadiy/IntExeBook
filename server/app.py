@@ -15,6 +15,7 @@ import json
 import mimetypes
 import os
 import re
+import secrets
 import sys
 import time
 import urllib.parse
@@ -167,6 +168,18 @@ class Handler(BaseHTTPRequestHandler):
             if parts == ["api", "installed-packs"]:
                 return self._send_json({"packs": loader.installed_packs()})
 
+            # ---- ADMIN (founder) hub endpoints — see web/admin.js ----------
+            # GET /api/admin/hub            -> list published hub courses
+            if parts == ["api", "admin", "hub"]:
+                self._require_admin(urllib.parse.parse_qs(parsed.query))
+                return self._send_json({"packs": loader.list_hub_packs(),
+                                        "dir": loader.SHARED_DIR})
+
+            # GET /api/admin/hub/<file>.iebpack.json  -> full pack for editing
+            if len(parts) == 4 and parts[:3] == ["api", "admin", "hub"]:
+                self._require_admin(urllib.parse.parse_qs(parsed.query))
+                return self._send_json(loader.read_hub_pack(parts[3]))
+
             # GET /api/textbooks/<id>/book/<slot>      -> unit/lesson/task tree
             if (len(parts) == 5 and parts[0] == "api"
                     and parts[3] == "book" and parts[1] == "textbooks"):
@@ -269,6 +282,20 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as exc:  # pragma: no cover
             return self._send_json({"error": "Server error: %s" % exc}, 500)
 
+    # ---------------------------------------------------------- admin auth
+    ADMIN_KEY = os.environ.get("IEB_ADMIN_KEY") or "akkaki"
+
+    def _require_admin(self, qs: dict) -> None:
+        """Guard for /api/admin/* endpoints.
+
+        The founder panel authenticates with a key: the IEB_ADMIN_KEY
+        environment variable when set, otherwise the default founder key.
+        A missing/wrong key is rejected with 403 — nothing else happens.
+        """
+        key = (qs.get("key") or [self.headers.get("X-IEB-Admin-Key") or ""])[0]
+        if not secrets.compare_digest(str(key), str(self.ADMIN_KEY)):
+            raise loader.TextbookError("admin key is missing or incorrect")
+
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("[intexebook] %s\n" % (fmt % args))
 
@@ -347,6 +374,16 @@ class Handler(BaseHTTPRequestHandler):
                 res = loader.import_pack(pack, body.get("id"))
                 return self._send_json(res)
 
+            # ---- ADMIN (founder) hub endpoints — see web/admin.js ----------
+            # POST /api/admin/hub?key=<admin>         -> publish a NEW course
+            # into the hub folder straight from the admin panel (works even
+            # in file:// mode where sync-publish needs a GitHub token).
+            if parts == ["api", "admin", "hub"]:
+                self._require_admin(urllib.parse.parse_qs(parsed.query))
+                res = loader.publish_course(body)
+                res["ok"] = True
+                return self._send_json(res)
+
             # POST /api/drafts/<name>                 -> autosave an editor draft
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "drafts":
                 loader.save_draft(parts[2], body)
@@ -370,6 +407,13 @@ class Handler(BaseHTTPRequestHandler):
             # PATCH /api/textbooks/<id>               -> update manifest / books
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "textbooks":
                 return self._send_json(loader.patch_textbook(parts[2], body))
+            # ---- ADMIN (founder): edit a published hub course in place ------
+            # PATCH /api/admin/hub/<file>?key=<admin>
+            if len(parts) == 4 and parts[:3] == ["api", "admin", "hub"]:
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query or "")
+                self._require_admin(qs)
+                pack = body.get("pack") if isinstance(body.get("pack"), dict) else body
+                return self._send_json(loader.save_hub_pack(parts[3], pack))
             return self._send_json({"error": "Unknown endpoint"}, 404)
         except loader.TextbookError as exc:
             return self._send_json({"error": str(exc)}, 400)
@@ -386,6 +430,13 @@ class Handler(BaseHTTPRequestHandler):
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "drafts":
                 ok = loader.delete_draft(parts[2])
                 return self._send_json({"ok": ok})
+            # ---- ADMIN (founder): remove a course from the hub --------------
+            # DELETE /api/admin/hub/<file>?key=<admin>
+            if len(parts) == 4 and parts[:3] == ["api", "admin", "hub"]:
+                qs = urllib.parse.parse_qs(parsed.query or "")
+                self._require_admin(qs)
+                return self._send_json({"ok": loader.delete_hub_pack(parts[3]),
+                                        "file": os.path.basename(parts[3])})
             return self._send_json({"error": "Unknown endpoint"}, 404)
         except Exception as exc:  # pragma: no cover
             return self._send_json({"error": "Server error: %s" % exc}, 500)
