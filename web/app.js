@@ -1317,31 +1317,98 @@ window.IEB_APP = {
 
   function founderMode(e) {
     e.preventDefault();
-    const host = document.body;
-    if (document.getElementById("akkaki-overlay")) { document.getElementById("akkaki-overlay").remove(); return; }
+    if (document.getElementById("akkaki-overlay")) { exitFounder(); return; }
+    document.documentElement.dataset.founder = "1";
+
+    /* ---- matrix rain canvas (behind everything, full screen) ---- */
+    const cv = document.createElement("canvas");
+    cv.id = "ak-rain";
+    cv.style.cssText = "position:fixed;inset:0;z-index:9998;pointer-events:none;opacity:.5";
+    document.body.appendChild(cv);
+    const ctx = cv.getContext("2d");
+    let W, H, cols, drops;
+    const GLYPHS = "Akkaki✦◆▚▞ΞΔΣΩλφψ01αβγ📖✨🎧";
+    function resize() {
+      W = cv.width = innerWidth; H = cv.height = innerHeight;
+      cols = Math.floor(W / 18); drops = Array.from({ length: cols }, () => (Math.random() * -H / 18) | 0);
+    }
+    resize(); addEventListener("resize", resize);
+    let raf, last = 0;
+    (function loop(t) {
+      raf = requestAnimationFrame(loop);
+      if (t - last < 45) return; last = t;
+      ctx.fillStyle = "rgba(5,8,18,.16)"; ctx.fillRect(0, 0, W, H);
+      ctx.font = "15px monospace";
+      for (let i = 0; i < cols; i++) {
+        const ch = GLYPHS[(Math.random() * GLYPHS.length) | 0];
+        const x = i * 18, y = drops[i] * 18;
+        ctx.fillStyle = ch === "A" || ch === "k" ? "#f472b6" : (Math.random() > .92 ? "#ffffff" : "#818cf8");
+        ctx.fillText(ch, x, y);
+        if (y > H && Math.random() > .975) drops[i] = 0;
+        drops[i]++;
+      }
+    })(0);
+
+    /* ---- glitch hero overlay ---- */
     const ov = document.createElement("div");
     ov.id = "akkaki-overlay";
-    ov.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(5,8,18,.72);backdrop-filter:blur(6px);cursor:pointer;animation:akFade .4s ease";
+    ov.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,rgba(30,20,60,.55),rgba(5,8,18,.85));backdrop-filter:blur(4px);cursor:pointer;animation:akFade .4s ease";
     ov.innerHTML = `
       <div style="text-align:center;color:#fff;font-family:inherit">
-        <div style="font-size:64px;letter-spacing:8px;filter:drop-shadow(0 0 24px #818cf8);animation:akSpin 3s linear infinite">✦</div>
-        <div style="margin-top:18px;font-size:28px;font-weight:700;background:linear-gradient(90deg,#818cf8,#c084fc,#f472b6,#818cf8);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:akFlow 2.5s linear infinite">Akkaki was here</div>
-        <div style="margin-top:10px;font-size:13px;opacity:.75">founder mode · click anywhere to close</div>
+        <div class="ak-cube-wrap"><div class="ak-cube">
+          <span class="f f1">📖</span><span class="f f2">✨</span><span class="f f3">🎧</span>
+          <span class="f f4">🎬</span><span class="f f5">⭐</span><span class="f f6">🛠</span>
+        </div></div>
+        <div class="ak-glitch" data-text="AKKAKI">AKKAKI</div>
+        <div style="margin-top:14px;font-size:15px;letter-spacing:6px;text-transform:uppercase;background:linear-gradient(90deg,#818cf8,#c084fc,#f472b6,#818cf8);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:akFlow 2.5s linear infinite">founder mode engaged</div>
+        <div style="margin-top:16px;font-size:12px;opacity:.6">click anywhere to return to the library · press Konami again to hide the sparkle</div>
       </div>`;
-    ov.addEventListener("click", () => ov.remove());
+    ov.addEventListener("click", exitFounder);
     const st = document.createElement("style");
-    st.textContent = "@keyframes akSpin{to{transform:rotate(360deg)}}@keyframes akFlow{to{background-position:300% 0}}@keyframes akFade{from{opacity:0}}";
+    st.id = "ak-style";
+    st.textContent = `
+@keyframes akFlow{to{background-position:300% 0}}
+@keyframes akFade{from{opacity:0}}
+@keyframes akCube{0%{transform:rotateX(-20deg) rotateY(0)}100%{transform:rotateX(-20deg) rotateY(360deg)}}
+@keyframes akGlitch{0%,86%,100%{transform:none;text-shadow:2px 0 #f472b6,-2px 0 #22d3ee}88%{transform:translateX(-6px) skewX(-8deg);text-shadow:8px 0 #f472b6,-8px 0 #22d3ee}90%{transform:translateX(6px);text-shadow:-6px 2px #f472b6,6px -2px #22d3ee}92%{transform:translateX(-3px) skewX(6deg)}}
+.ak-glitch{position:relative;display:inline-block;margin-top:26px;font-size:56px;font-weight:900;letter-spacing:10px;color:#fff;text-shadow:2px 0 #f472b6,-2px 0 #22d3ee;animation:akGlitch 2.2s steps(1) infinite}
+.ak-glitch::before,.ak-glitch::after{content:attr(data-text);position:absolute;left:0;top:0;width:100%;overflow:hidden}
+.ak-glitch::before{color:#f472b6;transform:translate(-3px,-2px);clip-path:polygon(0 0,100% 0,100% 32%,0 32%);opacity:.85}
+.ak-glitch::after{color:#22d3ee;transform:translate(3px,2px);clip-path:polygon(0 68%,100% 68%,100% 100%,0 100%);opacity:.85}
+.ak-cube-wrap{perspective:700px;display:inline-block}
+.ak-cube{position:relative;width:70px;height:70px;margin:0 auto;transform-style:preserve-3d;animation:akCube 6s linear infinite}
+.ak-cube .f{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:34px;background:rgba(129,140,248,.12);border:1px solid rgba(167,139,250,.5);box-shadow:0 0 22px rgba(129,140,248,.35) inset}
+.f1{transform:translateZ(35px)}.f2{transform:rotateY(90deg) translateZ(35px)}.f3{transform:rotateY(180deg) translateZ(35px)}
+.f4{transform:rotateY(-90deg) translateZ(35px)}.f5{transform:rotateX(90deg) translateZ(35px)}.f6{transform:rotateX(-90deg) translateZ(35px)}
+html[data-founder="1"] body{animation:akHue 8s linear infinite}
+@keyframes akHue{to{filter:hue-rotate(360deg)}}
+html[data-founder="1"] .app-version{background:linear-gradient(90deg,#f472b6,#818cf8)!important;-webkit-background-clip:text;background-clip:text;color:transparent!important;font-weight:800}`;
     document.head.appendChild(st);
-    host.appendChild(ov);
-    // brief confetti of book emojis
-    for (let i = 0; i < 24; i++) {
+    document.body.appendChild(ov);
+
+    /* ---- emoji + glyph confetti burst ---- */
+    const pieces = ["📖","✨","🎧","🎬","⭐","🛠","∎","◆","✦"];
+    for (let i = 0; i < 60; i++) {
       const s = document.createElement("span");
-      s.textContent = ["📖","✨","🎧","🎬","⭐"][i % 5];
-      s.style.cssText = `position:fixed;left:${Math.random()*100}vw;top:-4vh;z-index:10000;font-size:${14+Math.random()*22}px;pointer-events:none;transition:transform ${2+Math.random()*2}s cubic-bezier(.2,.6,.3,1),opacity 3s`;
+      s.textContent = pieces[(Math.random() * pieces.length) | 0];
+      const drift = (Math.random() * 40 - 20) | 0;
+      s.style.cssText = `position:fixed;left:${Math.random()*100}vw;top:-6vh;z-index:10000;font-size:${12+Math.random()*26}px;pointer-events:none;transition:transform ${2.4+Math.random()*2.6}s cubic-bezier(.2,.6,.3,1),opacity 4s`;
       document.body.appendChild(s);
-      requestAnimationFrame(() => { s.style.transform = `translateY(110vh) rotate(${(Math.random()*720-360)|0}deg)`; s.style.opacity = "0"; });
-      setTimeout(() => s.remove(), 4500);
+      requestAnimationFrame(() => { s.style.transform = `translate(${drift}vw,115vh) rotate(${(Math.random()*1080-540)|0}deg)`; s.style.opacity = "0"; });
+      setTimeout(() => s.remove(), 5500);
     }
+    /* ---- secret console signature ---- */
+    try {
+      console.log("%c✦ AKKAKI ✦\n%cfounder of IntExeBook — you entered the code.\n↑↑↓↓←→←→BA",
+        "font-size:28px;font-weight:900;background:linear-gradient(90deg,#818cf8,#f472b6);color:#fff;padding:6px 14px;border-radius:8px",
+        "font-size:13px;color:#c084fc");
+    } catch (err) {}
+  }
+
+  function exitFounder() {
+    const ov = document.getElementById("akkaki-overlay"); if (ov) ov.remove();
+    const cv = document.getElementById("ak-rain"); if (cv) cv.remove();
+    delete document.documentElement.dataset.founder;
   }
 })();
 
