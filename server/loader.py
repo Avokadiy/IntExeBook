@@ -1179,6 +1179,22 @@ def create_textbook(payload: dict) -> dict:
 def patch_textbook(id_or_folder: str, payload: dict) -> dict:
     """Overwrite manifest and/or book files of an existing course."""
     folder, manifest = get_textbook_meta(id_or_folder)
+    # Remember that a synced course was edited locally: the smart-import then
+    # chooses MERGE instead of silently overwriting the teacher's changes.
+    if (manifest.get("packageId") or "").startswith("pkg-") and not manifest.get("localModified"):
+        incoming_mf = payload.get("manifest") or {}
+        same_pack = (not incoming_mf.get("packageId")
+                     or incoming_mf.get("packageId") == manifest.get("packageId"))
+        if same_pack:
+            try:
+                mf_path = _find_manifest(folder)
+                if mf_path:
+                    saved = _read_manifest(mf_path)
+                    saved["localModified"] = True
+                    with open(mf_path, "w", encoding="utf-8") as fh:
+                        json.dump(saved, fh, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
     if payload.get("manifest"):
         mf = validate_manifest(dict(manifest, **payload["manifest"]))
         if not mf["ok"]:
@@ -1223,6 +1239,10 @@ def import_pack(pack: dict, new_id: Optional[str] = None) -> dict:
       * same packageId, both sides changed       -> MERGE task-by-task and bump
         the revision above every contributor's version
       * unknown packageId                        -> install as a new course
+
+    The returned "action" is always one of install/update/merge/skip — never
+    the client-side "fork"/"duplicate" words — so sync counters can't be fed
+    an unrecognised action and miscount it (bug: everything landed in "added").
     """
     if not isinstance(pack, dict) or pack.get("format") != "ieb-pack":
         raise TextbookError("this is not an IntExeBook exercise pack (.iebpack.json)")

@@ -762,15 +762,23 @@
         if (e && /HTTP 40[13]|Bad credentials/i.test(String(e.message))) break; /* auth issue: retrying won't help */
       }
     }
-    /* all attempts failed -> serve the last known index if we have one */
+    /* all attempts failed -> serve the last known index if we have one.
+       NOTE: only a NON-EMPTY cache may masquerade as an offline listing —
+       falling back to an empty cached list here used to hide real failures
+       behind “shared-exercises folder is empty”. */
     try {
       var cached = JSON.parse(syncStorage().getItem(cacheKey) || "null");
-      if (cached && cached.packs) return { packs: cached.packs, offline: true, error: lastErr && lastErr.message };
+      if (cached && Array.isArray(cached.packs) && cached.packs.length) {
+        return { packs: cached.packs, offline: true, error: lastErr && lastErr.message };
+      }
     } catch (e2) {}
     /* nothing fatal — treat as "no courses published yet" unless it's clearly auth */
     if (lastErr && /HTTP 40[13]|Bad credentials/i.test(String(lastErr.message))) {
       throw new Error("GitHub rejected access (token expired/revoked?). Open Sync settings and paste a fresh token.");
     }
+    /* A genuine network failure must NOT be silently reported as an empty
+       hub — surface it so syncPull shows an error instead of a fake success. */
+    if (lastErr) throw lastErr;
     return { packs: [], offline: false, note: "shared-exercises folder is empty" };
   }
 
@@ -931,9 +939,12 @@
     return false;
   }
 
-  /* install one downloaded pack through the local backend (server mode);
-     in file:// mode there is no backend, so we remember it locally and hand
-     the JSON back to the caller to offer a .iebpack download instead. */
+  /* install one downloaded pack through the local backend (server mode).
+     In file:// mode there is no backend and a browser page cannot write into
+     shared-exercises/ — so NOTHING is installed locally; we only remember the
+     pack in the registry and hand the JSON back so the UI can offer a
+     .iebpack download. The caller must treat `offline: true` as “not really
+     updated” (see syncPull) to avoid false success reports. */
   async function installPack(pack, decision) {
     var title = (pack.manifest && pack.manifest.title) || pack.packageId || "course";
     try {
@@ -965,11 +976,19 @@
     return { action: (decision && decision.action) || "install", title: title, offline: true, pack: pack };
   }
 
-  /* the heart of the one-button flow: pull everything, apply smart-import
-     decisions per package, remember what came from sync */
+  /* Pull every shared course from GitHub.
+
+     Correctness rules (bug fix — “reports all courses as updated even though
+     shared-exercises/ is empty”):
+       * a course may be counted in added/updated/merged ONLY after it was
+         actually downloaded AND successfully installed this run;
+       * nothing was listed  -> report that plainly instead of pretending the
+         previously-known courses were refreshed;
+       * an install failure must land in errors, never silently inflate the
+         success counters. */
   async function syncPull(onProgress) {
     var cfg = await syncResolveHubBranch(syncConfig());
-    var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false, note: "" };
+    var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false, note: "", listed: 0 };
     var listed;
     try {
       listed = await syncListPacks(cfg);
@@ -979,11 +998,19 @@
     }
     result.offline = !!listed.offline;
     if (listed.note) result.note = listed.note;
-    var reg0 = syncRegistry();
+    var packs = (listed && listed.packs) || [];
+    result.listed = packs.length;
+    if (!packs.length) {
+      /* Nothing in the shared folder (or only a stale cache): say so instead
+         of reporting fake updates. A cached-but-empty index is treated the
+         same way — an empty listing can never mean “N courses updated”. */
+      if (!result.note) result.note = "shared-exercises folder is empty — no published courses to update";
+      return result;
+    }
     var installed = await listInstalledPacks();
-    for (var i = 0; i < listed.packs.length; i++) {
-      var p = listed.packs[i];
-      if (onProgress) onProgress(i + 1, listed.packs.length, p.name);
+    for (var i = 0; i < packs.length; i++) {
+      var p = packs[i];
+      if (onProgress) onProgress(i + 1, packs.length, p.name);
       try {
         /* ZERO-COPY GUARANTEE: if this exact file was already pulled into a
            course on THIS machine before (even in an earlier browser session),
@@ -1021,6 +1048,9 @@
           result.skipped.push(p.name); continue;
         }
         var install = await installPack(pack, decision);
+        if (!install || install.ok === false) {
+          throw new Error((install && install.error) || "installation failed");
+        }
         /* verify the backend really stamped our packageId into the course;
            if not (old server build), remember that fact so the NEXT sync
            still skips this pack by content digest instead of installing a
@@ -1032,7 +1062,8 @@
         var act = install.action || decision.action;
         if (act === "merge" || act === "fork") result.merged.push(install.title || p.name);
         else if (act === "update") result.updated.push(install.title || p.name);
-        else if (act !== "skip") result.added.push(install.title || p.name);
+        else if (act === "skip") result.skipped.push(p.name);
+        else result.added.push(install.title || p.name);
       } catch (e) {
         result.errors.push(p.name + ": " + e.message);
       }
@@ -1042,7 +1073,7 @@
 
   /* publish one local course pack into the shared GitHub folder */
   async function syncPushPack(pack) {
-    var cfg = syncConfig();
+    var cfg = await syncResolveHubBranch(syncConfig());
     if (!cfg.token) throw new Error("No GitHub token configured for sync");
     /* If the exact same content is already in the hub, don't push a new
        revision — re-publishing an unchanged course used to make every peer
@@ -1098,6 +1129,8 @@
     SYNC_DEFAULTS: SYNC_DEFAULTS, syncConfig: syncConfig, saveSyncConfig: saveSyncConfig,
     syncRawUrl: rawUrl, syncApiBase: apiBase, ghFetch: ghFetch,
     syncListPacks: syncListPacks, syncDownloadPack: syncDownloadPack, syncUploadPack: syncUploadPack,
+    syncResolveHubBranch: syncResolveHubBranch,
+    syncResolveDefaultBranch: syncResolveHubBranch,
     syncRegistry: syncRegistry, syncRegistrySet: syncRegistrySet, syncPull: syncPull,
     syncPushPack: syncPushPack, sync: module_exports_sync()
   };
