@@ -1287,18 +1287,23 @@ window.IEB_APP = {
   });
 
   function activateEgg() {
-    if (unlocked) { toast("🥚 Already unlocked — press ✨ in the brand."); return; }
-    unlocked = true;
-    try { sessionStorage.setItem("ieb-egg", "1"); } catch (err) {}
-    toast("🕹️ Konami accepted. Hidden mode unlocked…");
+    if (unlocked) { toast("🥚 Already unlocked — the full show plays again now."); }
+    else {
+      unlocked = true;
+      try { sessionStorage.setItem("ieb-egg", "1"); } catch (err) {}
+      toast("🕹️ Konami accepted. Founder mode engaging…");
+    }
+    /* sparkle the brand + version badge (permanent after unlock) */
     const brand = document.getElementById("brandHome");
     if (brand) {
       brand.textContent = "✨ 📖 IntExeBook";
       brand.title = "You found it.";
-      brand.addEventListener("click", founderMode);
+      if (!brand._akBound) { brand.addEventListener("click", founderMode); brand._akBound = true; }
     }
     const ver = document.getElementById("appVersion");
     if (ver) ver.textContent = "v1.0 · akkaki edition";
+    /* the FULL show fires immediately — no extra click needed */
+    founderMode();
   }
   if (unlocked && document.readyState !== "loading") {
     const b = document.getElementById("brandHome");
@@ -1316,7 +1321,7 @@ window.IEB_APP = {
   }
 
   function founderMode(e) {
-    e.preventDefault();
+    if (e && typeof e.preventDefault === "function") e.preventDefault();
     if (document.getElementById("akkaki-overlay")) { exitFounder(); return; }
     document.documentElement.dataset.founder = "1";
 
