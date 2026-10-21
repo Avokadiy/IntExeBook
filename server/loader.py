@@ -798,6 +798,25 @@ def validate_manifest(m: Any) -> dict:
         v = _s(m.get(key))
         if v:
             value[key] = v
+    # passport fields must survive validation — otherwise an installed course
+    # loses its packageId/revision/fingerprint and every re-sync installs a
+    # brand-new copy instead of recognising the existing one.
+    pid = _s(m.get("packageId"))
+    if pid:
+        value["packageId"] = pid
+    try:
+        rev = int(m.get("revision") or 1)
+    except (TypeError, ValueError):
+        rev = 1
+    if pid:
+        value["revision"] = max(1, rev)
+    fp = _s(m.get("fingerprint"))
+    if fp:
+        value["fingerprint"] = fp
+    if isinstance(m.get("contributors"), list) and m["contributors"]:
+        value["contributors"] = m["contributors"][:20]
+    if m.get("localModified") is True:
+        value["localModified"] = True
     if not value.get("created"):
         value["created"] = __import__("datetime").date.today().isoformat()
     value.update(books)
@@ -1164,6 +1183,19 @@ def patch_textbook(id_or_folder: str, payload: dict) -> dict:
                 books[slot] = vb["value"]
     if errs:
         raise TextbookError("; ".join(errs))
+    # a manual edit by the owner marks the course as locally modified: sync
+    # will then merge incoming changes instead of overwriting them
+    old_fp = _s(manifest.get("fingerprint"))
+    full_books = dict(books)
+    for slot in ("student", "workbook"):
+        if slot not in full_books:
+            try:
+                full_books[slot] = load_book(folder, manifest, slot)
+            except Exception:
+                pass
+    new_fp = pack_fingerprint(manifest, full_books)
+    if old_fp and new_fp != old_fp and manifest.get("packageId"):
+        manifest["localModified"] = True
     write_textbook(folder, manifest, books, payload.get("assets") or {})
     invalidate_cache()
     return {"folder": os.path.basename(folder), "id": manifest.get("id"), "title": manifest.get("title")}
@@ -1208,12 +1240,13 @@ def import_pack(pack: dict, new_id: Optional[str] = None) -> dict:
         res = patch_textbook(os.path.basename(folder), payload)
         # store passport fields into the manifest so future imports recognise it
         mf_path = _find_manifest(folder)
-        saved = _read_manifest(mf_path)
-        saved.update({"packageId": package_id, "revision": merged_rev,
-                      "fingerprint": merged_manifest.get("fingerprint") or info["fingerprint"],
-                      "contributors": merged_manifest.get("contributors", [])})
-        with open(mf_path, "w", encoding="utf-8") as fh:
-            json.dump(saved, fh, ensure_ascii=False, indent=2)
+        if mf_path:
+            saved = _read_manifest(mf_path)
+            saved.update({"packageId": package_id, "revision": merged_rev,
+                          "fingerprint": merged_manifest.get("fingerprint") or info["fingerprint"],
+                          "contributors": merged_manifest.get("contributors", [])})
+            with open(mf_path, "w", encoding="utf-8") as fh:
+                json.dump(saved, fh, ensure_ascii=False, indent=2)
         invalidate_cache()
         action = "update" if cur_rev <= merged_rev else "merge"
         res.update({"action": action, "packageId": package_id, "revision": merged_rev})
@@ -1262,15 +1295,15 @@ def merge_pack_with_local(incoming: dict, local: dict) -> tuple:
     inc_author = _s(inc_mf.get("author")) or "unknown"
     loc_author = _s(loc_mf.get("author")) or "unknown"
 
-    # index local tasks by id
-    loc_tasks = {t.get("id"): t for _u, _l, t in _walk_tasks_of(inc_books, loc_books)}
-
-    def _walk_tasks_of(_i, loc_book_dict):
+    def _walk_tasks_of(book_dict):
         out = []
-        for slot, b in (loc_book_dict or {}).items():
+        for _slot, b in (book_dict or {}).items():
             if isinstance(b, dict):
                 out.extend(list(_walk_tasks(b)))
         return out
+
+    # index local tasks by id
+    loc_tasks = {t.get("id"): t for t in _walk_tasks_of(loc_books)}
 
     merged_books: dict = {}
     conflicts = 0
@@ -1649,8 +1682,12 @@ def scan_textbooks() -> list[dict]:
 
 def installed_packs() -> list[dict]:
     """Passport view of everything already on this machine — used by the
-    client-side smart-import/sync to decide install/update/merge/skip."""
-    out: list[dict] = []
+    client-side smart-import/sync to decide install/update/merge/skip.
+
+    Exactly ONE entry per packageId (the richest fingerprint wins), otherwise
+    a course that exists both as an installed folder and as a flat pack in
+    shared-exercises/ would report twice and confuse the decision logic."""
+    out: dict[str, dict] = {}
     try:
         for c in scan_textbooks():
             mf: dict = {}
@@ -1661,16 +1698,22 @@ def installed_packs() -> list[dict]:
             pkg = c.get("packageId") or mf.get("packageId")
             if not pkg:
                 continue
-            out.append({
+            fp = mf.get("fingerprint") or c.get("fingerprint") or ""
+            rev = int(mf.get("revision") or c.get("revision") or 1)
+            entry = {
                 "packageId": pkg,
-                "revision": int(mf.get("revision") or c.get("revision") or 1),
-                "fingerprint": mf.get("fingerprint") or "",
+                "revision": rev,
+                "fingerprint": fp,
                 "title": c.get("title", ""),
                 "localModified": bool(mf.get("localModified")),
-            })
+            }
+            prev = out.get(pkg)
+            # keep the entry with a real fingerprint / higher revision
+            if prev is None or (not prev["fingerprint"] and fp) or rev > prev["revision"]:
+                out[pkg] = entry
     except Exception:
         pass
-    return out
+    return list(out.values())
 
 
 def _ensure_folder_for(base_dir: str, entry: str) -> Optional[str]:
