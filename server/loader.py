@@ -69,7 +69,14 @@ PACK_EXT = ".iebpack.json"
 
 TASK_TYPES = ("multiple-choice", "true-false", "gap-fill", "word-order", "matching",
               "choose-odd-one-out", "find-and-click", "click-on-picture",
-              "word-search", "translate-match")
+              "word-search", "translate-match",
+              # extended set (v2): audio / video / text skills
+              "listen-choice", "dictation", "listen-gap", "video-quiz",
+              "video-sequence", "reading-truefalse", "short-answer", "spelling",
+              "multiple-select", "reorder-text", "categorize", "crosswords",
+              "sentence-transform", "error-correction", "initials",
+              "choose-picture", "timeline", "definition-match", "memory-pairs",
+              "speaking-repeat")
 
 
 class TextbookError(Exception):
@@ -694,6 +701,296 @@ def validate_task(raw: Any) -> dict:
                 tm_seen.add(l.lower())
                 tm_clean.append({"left": l, "right": r})
         out["pairs"] = tm_clean
+    elif ttype == "listen-choice":
+        lc_opts = [_s(o) for o in raw.get("options") or []] if isinstance(raw.get("options"), list) else []
+        if len([o for o in lc_opts if o]) < 2:
+            errors.append("needs at least 2 answer options")
+        try:
+            lc_ai = int(raw.get("answerIndex"))
+        except (TypeError, ValueError):
+            lc_ai = -1
+        if not (0 <= lc_ai < len(lc_opts)):
+            errors.append("no correct option marked")
+        if not isinstance(raw.get("media"), list) or not raw.get("media"):
+            warnings.append("attach an audio clip in the Media tab — this is a listening task")
+        out["options"] = lc_opts
+        out["answerIndex"] = lc_ai
+    elif ttype == "dictation":
+        dic_text = _s(raw.get("text"))
+        if not dic_text:
+            errors.append("the dictation text (what the student should type) is empty")
+        if not isinstance(raw.get("media"), list) or not raw.get("media"):
+            warnings.append("attach an audio clip in the Media tab — this is a listening task")
+        out["text"] = dic_text
+    elif ttype == "listen-gap":
+        lg_text = _s(raw.get("text"))
+        lg_gaps = len(_re.findall(r"_{2,}", lg_text))
+        lg_blanks = raw.get("blanks") if isinstance(raw.get("blanks"), list) else []
+        if not lg_text:
+            errors.append("the lyrics / sentence text is empty")
+        if not lg_gaps:
+            errors.append("no gaps found — use ___ in the text")
+        if lg_gaps and len(lg_blanks) != lg_gaps:
+            errors.append("%d gap(s) in the text but %d answer(s) given" % (lg_gaps, len(lg_blanks)))
+        lg_clean = []
+        for i, b in enumerate(lg_blanks):
+            ans = [a for a in map(_s, (b.get("answers") if isinstance(b, dict) and isinstance(b.get("answers"), list) else [])) if a]
+            if not ans:
+                errors.append("gap %d has no accepted answer" % (i + 1))
+            item = {"answers": ans}
+            if isinstance(b, dict) and _s(b.get("hint")):
+                item["hint"] = _s(b.get("hint"))
+            lg_clean.append(item)
+        out["text"] = lg_text
+        out["blanks"] = lg_clean
+        if not isinstance(raw.get("media"), list) or not raw.get("media"):
+            warnings.append("attach an audio clip in the Media tab — this is a listening task")
+    elif ttype == "video-quiz":
+        vq_list = raw.get("questions") if isinstance(raw.get("questions"), list) else []
+        if not vq_list:
+            errors.append("add at least one question about the video")
+        vq_clean = []
+        for i, q in enumerate(vq_list):
+            qt = _s(q.get("text")) if isinstance(q, dict) else ""
+            qo = [_s(o) for o in q.get("options")] if isinstance(q, dict) and isinstance(q.get("options"), list) else []
+            try:
+                qa = int(q.get("answerIndex")) if isinstance(q, dict) else -1
+            except (TypeError, ValueError):
+                qa = -1
+            if not qt:
+                errors.append("question %d has no text" % (i + 1))
+            if len([o for o in qo if o]) < 2:
+                errors.append("question %d needs at least 2 options" % (i + 1))
+            if not (0 <= qa < len(qo)):
+                errors.append("question %d has no correct option marked" % (i + 1))
+            vq_clean.append({"text": qt, "options": qo, "answerIndex": qa})
+        out["questions"] = vq_clean
+        media_in2 = raw.get("media") if isinstance(raw.get("media"), list) else []
+        if not any(isinstance(m, dict) and _s(m.get("type")) == "video" for m in media_in2):
+            warnings.append("attach a video clip in the Media tab")
+    elif ttype == "video-sequence":
+        vs_items = [_s(x) for x in (raw.get("items") or []) if _s(x)] if isinstance(raw.get("items"), list) else []
+        if len(vs_items) < 3:
+            errors.append("needs at least 3 events to order")
+        out["items"] = vs_items
+    elif ttype == "reading-truefalse":
+        rt_passage = _s(raw.get("passage"))
+        if not rt_passage:
+            errors.append("the reading passage is empty")
+        rt_st = raw.get("statements") if isinstance(raw.get("statements"), list) else []
+        if len(rt_st) < 2:
+            errors.append("add at least 2 statements")
+        rt_clean = []
+        for i, s in enumerate(rt_st):
+            st = _s(s.get("text")) if isinstance(s, dict) else ""
+            if not st:
+                errors.append("statement %d is empty" % (i + 1)); continue
+            if not isinstance(s, dict) or not isinstance(s.get("answer"), bool):
+                errors.append("statement %d must be marked true or false" % (i + 1))
+            rt_clean.append({"text": st, "answer": bool(isinstance(s, dict) and s.get("answer"))})
+        out["passage"] = rt_passage
+        out["statements"] = rt_clean
+    elif ttype == "short-answer":
+        sa_q = _s(raw.get("question"))
+        sa_ans = [a for a in map(_s, (raw.get("answers") or [])) if a] if isinstance(raw.get("answers"), list) else []
+        if not sa_q:
+            errors.append("the question is empty")
+        if not sa_ans:
+            errors.append("add at least one accepted answer")
+        out["question"] = sa_q
+        out["answers"] = sa_ans
+        if _s(raw.get("model")):
+            out["model"] = _s(raw.get("model"))
+    elif ttype == "spelling":
+        sp_word = _s(raw.get("word"))
+        if not sp_word:
+            errors.append("the target word is empty")
+        if _re.search(r"[.,!?]", sp_word):
+            errors.append("the word itself should not contain punctuation")
+        out["word"] = sp_word
+        if _s(raw.get("prompt")):
+            out["prompt"] = _s(raw.get("prompt"))
+    elif ttype == "multiple-select":
+        ms_raw = raw.get("options") if isinstance(raw.get("options"), list) else []
+        ms_clean = []
+        for i, o in enumerate(ms_raw):
+            t = _s(o.get("text")) if isinstance(o, dict) else _s(o)
+            if not t:
+                errors.append("option %d is empty" % (i + 1)); continue
+            ms_clean.append({"text": t, "correct": bool(o.get("correct")) if isinstance(o, dict) else False})
+        ms_ok = sum(1 for o in ms_clean if o["correct"])
+        if len(ms_clean) < 3:
+            errors.append("needs at least 3 options")
+        if not ms_ok:
+            errors.append("mark at least one option as correct")
+        if ms_ok >= len(ms_clean):
+            errors.append("keep at least one wrong option")
+        out["options"] = ms_clean
+    elif ttype == "reorder-text":
+        ro_lines = [_s(x) for x in (raw.get("lines") or []) if _s(x)] if isinstance(raw.get("lines"), list) else []
+        if len(ro_lines) < 3:
+            errors.append("needs at least 3 lines in the correct order")
+        out["lines"] = ro_lines
+    elif ttype == "categorize":
+        cg_cats = raw.get("categories") if isinstance(raw.get("categories"), list) else []
+        if len(cg_cats) < 2:
+            errors.append("needs at least 2 categories")
+        cg_clean, cg_names = [], set()
+        for i, c in enumerate(cg_cats):
+            name = _s(c.get("name")) if isinstance(c, dict) else ""
+            items = [x for x in map(_s, (c.get("items") if isinstance(c, dict) and isinstance(c.get("items"), list) else [])) if x]
+            if not name:
+                errors.append("category %d has no name" % (i + 1))
+            elif name.lower() in cg_names:
+                errors.append("duplicate category “%s”" % name)
+            elif not items:
+                errors.append("category “%s” has no items" % name)
+            else:
+                cg_names.add(name.lower())
+                cg_clean.append({"name": name, "items": items})
+        if sum(len(c["items"]) for c in cg_clean) < 3:
+            errors.append("add at least 3 items in total")
+        out["categories"] = cg_clean
+    elif ttype == "crosswords":
+        cw_cells = raw.get("cells") if isinstance(raw.get("cells"), list) else []
+        cw_clues = raw.get("clues") if isinstance(raw.get("clues"), list) else []
+        if not cw_cells:
+            errors.append("draw the grid first — click cells in the editor preview (or use the generator)")
+        if len(cw_clues) < 2:
+            errors.append("add at least 2 clues")
+        cw_clean = []
+        for i, cl in enumerate(cw_clues):
+            w = _re.sub("[^A-Z\u0410-\u042f\u0401]", "", str(cl.get("word") or "").upper()) if isinstance(cl, dict) else ""
+            d = _s(cl.get("dir")) if isinstance(cl, dict) else ""
+            q = _s(cl.get("clue")) if isinstance(cl, dict) else ""
+            if not w or d not in ("across", "down") or not q:
+                errors.append("clue %d: word, direction (across/down) and clue text are required" % (i + 1))
+            else:
+                cw_clean.append({"word": w, "dir": d, "clue": q})
+        cw_grid = set()
+        for c in cw_cells:
+            if isinstance(c, dict):
+                try:
+                    cw_grid.add((int(c.get("x")), int(c.get("y"))))
+                except (TypeError, ValueError):
+                    pass
+        for cl in cw_clean:
+            dx, dy = (1, 0) if cl["dir"] == "across" else (0, 1)
+            fits = any(all((sx + dx * k, sy + dy * k) in cw_grid for k in range(len(cl["word"])))
+                       for sx, sy in cw_grid)
+            if not fits:
+                errors.append("word “%s” does not fit into the drawn grid" % cl["word"])
+        out["cells"] = [{"x": int(c.get("x") or 0), "y": int(c.get("y") or 0)}
+                        for c in cw_cells if isinstance(c, dict)]
+        out["clues"] = cw_clean
+    elif ttype == "sentence-transform":
+        st_src = _s(raw.get("source"))
+        st_ans = [a for a in map(_s, (raw.get("answers") or [])) if a] if isinstance(raw.get("answers"), list) else []
+        if not st_src:
+            errors.append("the source sentence is empty")
+        if not st_ans:
+            errors.append("add at least one accepted transformed sentence")
+        out["source"] = st_src
+        if _s(raw.get("task")):
+            out["task"] = _s(raw.get("task"))
+        out["answers"] = st_ans
+    elif ttype == "error-correction":
+        ec_sent = _s(raw.get("sentence"))
+        ec_tok = [w for w in ec_sent.split() if w]
+        try:
+            ec_idx = int(raw.get("wrongIndex"))
+        except (TypeError, ValueError):
+            ec_idx = -1
+        if not ec_sent:
+            errors.append("the sentence is empty")
+        if len(ec_tok) < 3:
+            errors.append("the sentence needs at least 3 words")
+        if not (0 <= ec_idx < len(ec_tok)):
+            errors.append("mark which word is wrong (click it in the editor preview)")
+        out["sentence"] = ec_sent
+        out["wrongIndex"] = ec_idx
+        if _s(raw.get("fix")):
+            out["fix"] = _s(raw.get("fix"))
+    elif ttype == "initials":
+        ini_items = raw.get("items") if isinstance(raw.get("items"), list) else []
+        ini_clean = []
+        for i, it in enumerate(ini_items):
+            w = _s(it.get("word")) if isinstance(it, dict) else ""
+            if not w:
+                errors.append("item %d has no word" % (i + 1)); continue
+            ini = (_s(it.get("initial"))[:1].lower() if isinstance(it, dict) and _s(it.get("initial")) else w[0].lower())
+            ini_clean.append({"word": w, "initial": ini})
+        if len(ini_clean) < 2:
+            errors.append("add at least 2 words")
+        out["items"] = ini_clean
+    elif ttype == "choose-picture":
+        cp_pics = raw.get("images") if isinstance(raw.get("images"), list) else []
+        if len(cp_pics) < 2:
+            errors.append("add at least 2 pictures")
+        cp_clean, cp_ok = [], 0
+        for i, p in enumerate(cp_pics):
+            src = _s(p.get("src")) if isinstance(p, dict) else ""
+            if not src:
+                errors.append("picture %d is missing — upload images in the Content form" % (i + 1)); continue
+            ok = bool(p.get("correct")) if isinstance(p, dict) else False
+            if ok:
+                cp_ok += 1
+            cp_clean.append({"src": src, "caption": _s(p.get("caption")) if isinstance(p, dict) else "", "correct": ok})
+        if not cp_ok:
+            errors.append("mark one picture as the correct answer")
+        if cp_ok >= len(cp_clean):
+            errors.append("keep at least one wrong picture")
+        if not _s(raw.get("prompt")):
+            errors.append("the prompt (question / word the student matches) is empty")
+        out["prompt"] = _s(raw.get("prompt"))
+        out["images"] = cp_clean
+    elif ttype == "timeline":
+        tl_ev = raw.get("events") if isinstance(raw.get("events"), list) else []
+        if len(tl_ev) < 3:
+            errors.append("needs at least 3 events")
+        tl_clean = []
+        for i, e in enumerate(tl_ev):
+            lab = _s(e.get("label")) if isinstance(e, dict) else ""
+            dt = _s(e.get("date")) if isinstance(e, dict) else ""
+            if not lab:
+                errors.append("event %d has no label" % (i + 1))
+            else:
+                tl_clean.append({"label": lab} if not dt else {"label": lab, "date": dt})
+        out["events"] = tl_clean
+    elif ttype == "definition-match":
+        dm_pairs = raw.get("pairs") if isinstance(raw.get("pairs"), list) else []
+        if len(dm_pairs) < 2:
+            errors.append("needs at least 2 word/definition pairs")
+        dm_seen, dm_clean = set(), []
+        for i, p in enumerate(dm_pairs):
+            l = _s(p.get("left")) if isinstance(p, dict) else ""
+            r = _s(p.get("right")) if isinstance(p, dict) else ""
+            if not l or not r:
+                errors.append("pair %d is incomplete (word + definition needed)" % (i + 1))
+            elif l.lower() in dm_seen:
+                errors.append("duplicate word “%s”" % l)
+            else:
+                dm_seen.add(l.lower())
+                dm_clean.append({"left": l, "right": r})
+        out["pairs"] = dm_clean
+    elif ttype == "memory-pairs":
+        mp_pairs = raw.get("pairs") if isinstance(raw.get("pairs"), list) else []
+        if len(mp_pairs) < 3:
+            errors.append("needs at least 3 card pairs")
+        mp_clean = []
+        for i, p in enumerate(mp_pairs):
+            f = _s(p.get("front")) if isinstance(p, dict) else ""
+            b = _s(p.get("back")) if isinstance(p, dict) else ""
+            if not f or not b:
+                errors.append("pair %d is incomplete (front + back needed)" % (i + 1))
+            else:
+                mp_clean.append({"front": f, "back": b})
+        out["pairs"] = mp_clean
+    elif ttype == "speaking-repeat":
+        sr_text = _s(raw.get("modelText"))
+        if not sr_text:
+            errors.append("the model phrase the student repeats is empty")
+        out["modelText"] = sr_text
 
     return {"ok": not errors, "errors": errors, "warnings": warnings, "value": out}
 

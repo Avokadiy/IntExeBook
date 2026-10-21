@@ -763,6 +763,69 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
       if (btnRetry) btnRetry.style.display = ok ? "none" : "inline-flex";
     }
 
+
+    /* ---- shared helpers for the extended (v2) engines ---- */
+    const _normAns = s => String(s == null ? "" : s).trim().toLowerCase()
+      .replace(/[.,!?;:"'‘’«»“”()]+/g, " ")
+      .replace(/\s+/g, " ").trim();
+    function resolveSrc(src) {
+      src = String(src || "");
+      if (!src) return "";
+      if (/^(https?:|data:|blob:)/.test(src)) return src;
+      if (typeof mediaSrc === "function" && ctx.tbId != null && ctx.tbId !== "") {
+        try { return mediaSrc(ctx.tbId, src); } catch (e) { /* fall through */ }
+      }
+      return src;
+    }
+    function anyMedia(kind) {
+      return (task.media || []).find(m => m && m.type === kind) || null;
+    }
+    function mediaPlayerHtml(m, extraLabel) {
+      if (!m) return "";
+      const src = esc(resolveSrc(m.src));
+      const tag = m.type === "audio"
+        ? `<audio controls preload="metadata" src="${src}"></audio>`
+        : m.type === "video"
+          ? `<video controls preload="metadata" src="${src}" style="max-width:100%;border-radius:12px"></video>`
+          : `<img loading="lazy" src="${src}" alt="${esc(m.caption || "")}" style="max-width:100%;border-radius:12px">`;
+      return `<div class="ex-media">${tag}${extraLabel ? `<div class="explain">${esc(extraLabel)}</div>` : ""}</div>`;
+    }
+    function ttsBtn(text) {
+      return `<button class="opt-btn tiny tts-btn" type="button">\u{1F50A} Listen (speech)</button>` +
+        `<div class="sr-only" data-tts="${esc(text)}"></div>`;
+    }
+    function wireTts(root) {
+      root.querySelectorAll(".tts-btn").forEach(b => {
+        b.onclick = () => {
+          try {
+            const t = b.nextElementSibling && b.nextElementSibling.dataset.tts;
+            const u = new SpeechSynthesisUtterance(t);
+            u.lang = "en-GB"; u.rate = 0.95;
+            speechSynthesis.cancel(); speechSynthesis.speak(u);
+          } catch (e) { alert("Speech synthesis is not available in this browser."); }
+        };
+      });
+    }
+    function shuffleArr(arr) {
+      const a = arr.slice();
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+    function resetEngineV2(fn) {
+      renderEngine.reset = () => {
+        feedback.innerHTML = "";
+        if (btnNext) btnNext.disabled = true;
+        if (btnRetry) btnRetry.style.display = "none";
+        fn();
+      };
+    }
+    function finishList(ok, okMsg, badMsg) {
+      setFeedback(ok, ok ? (okMsg || task.explanation || "") : (task.explanation || badMsg || ""));
+    }
+
     /* multiple choice */
     function engineMC() {
       let locked = false;
@@ -1237,6 +1300,653 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
       };
     }
 
+
+    /* ===================== extended set (v2): 20 new engines ===================== */
+
+    /* listen-choice — audio clip + multiple choice */
+    function engineListenChoice() {
+      let locked = false;
+      const m = anyMedia("audio");
+      body.innerHTML = (m ? mediaPlayerHtml(m) : "") + ttsBtn(task.instruction || "") + "<div class='lc-opts'></div>";
+      wireTts(body);
+      const host = body.querySelector(".lc-opts");
+      (task.options || []).forEach((opt, i) => {
+        const b = document.createElement("button");
+        b.className = "opt-btn";
+        b.innerHTML = `<b>${String.fromCharCode(65 + i)}.</b>&nbsp; ${esc(opt)}`;
+        b.onclick = () => {
+          if (locked) return;
+          locked = true;
+          const ok = i === task.answerIndex;
+          [...host.children].forEach((el, j) => {
+            el.disabled = true;
+            if (j === task.answerIndex) el.classList.add("correct");
+            else if (j === i) el.classList.add("wrong");
+            else el.classList.add("dim");
+          });
+          setFeedback(ok, ok ? "" : (task.explanation || `The correct answer is \u201c${task.options[task.answerIndex]}\u201d.`));
+        };
+        host.appendChild(b);
+      });
+      resetEngineV2(engineListenChoice);
+    }
+
+    /* dictation — type exactly what you hear */
+    function engineDictation() {
+      const m = anyMedia("audio");
+      body.innerHTML = (m ? mediaPlayerHtml(m) : "") + ttsBtn(task.text || "") +
+        `<div><textarea class="dict-area" rows="3" placeholder="Type what you hear\u2026" autocomplete="off"></textarea></div>`;
+      wireTts(body);
+      const ta = body.querySelector(".dict-area");
+      ta.focus();
+      const check = () => {
+        const got = _normAns(ta.value), want = _normAns(task.text);
+        if (!got) { finishList(false, "", "Type what you heard first."); return; }
+        const wa = want.split(" "), gb = got.split(" ");
+        let hits = 0;
+        wa.forEach(w => { if (gb.indexOf(w) >= 0) hits++; });
+        const ratio = wa.length ? hits / wa.length : 0;
+        const ok = ratio >= 0.85;
+        ta.disabled = true;
+        finishList(ok, "Transcript: " + task.text, "Almost! Transcript: " + task.text);
+      };
+      ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); check(); } });
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineDictation);
+    }
+
+    /* listen-gap — lyrics/dialogue with typed gaps while listening */
+    function engineListenGap() {
+      const m = anyMedia("audio");
+      const blanks = task.blanks || [];
+      const html = esc(task.text || "").replace(/_{2,}/g, () => `<input class="gap-input" type="text" autocomplete="off">`);
+      body.innerHTML = (m ? mediaPlayerHtml(m) : "") + ttsBtn(task.text || "") + `<div class="gap-text">${html}</div>`;
+      wireTts(body);
+      const inputs = [...body.querySelectorAll(".gap-input")];
+      inputs.forEach((inp, i) => {
+        const hint = blanks[i] && blanks[i].hint;
+        if (hint) inp.insertAdjacentHTML("afterend", ` <span class="hint-link" title="${esc(hint)}">\ud83d\udca1</span>`);
+      });
+      body.querySelectorAll(".hint-link").forEach((hl, i) => { hl.onclick = () => alert("\ud83d\udca1 " + (blanks[i].hint || "")); });
+      const check = () => {
+        let allFilled = true, allOk = true;
+        inputs.forEach((inp, i) => {
+          const accepted = ((blanks[i] || {}).answers || []).map(_normAns);
+          const v = _normAns(inp.value);
+          if (!v) allFilled = false;
+          const good = accepted.indexOf(v) >= 0;
+          inp.classList.toggle("correct", good);
+          inp.classList.toggle("wrong", !good);
+          if (!good) allOk = false;
+        });
+        if (!allFilled) { finishList(false, "", "Fill in every gap first."); return; }
+        inputs.forEach(inp => { inp.disabled = true; });
+        finishList(allOk, "", "Some gaps are not correct yet.");
+      };
+      inputs.forEach(inp => inp.addEventListener("keydown", e => { if (e.key === "Enter") check(); }));
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineListenGap);
+    }
+
+    /* video-quiz — watch the clip, then answer questions */
+    function engineVideoQuiz() {
+      const qs = task.questions || [];
+      const mv = anyMedia("video") || anyMedia("audio");
+      body.innerHTML = (mv ? mediaPlayerHtml(mv) : "") + "<div class='vq-list'></div>";
+      const host = body.querySelector(".vq-list");
+      const picked = new Array(qs.length).fill(-1);
+      let checked = false;
+      qs.forEach((q, qi) => {
+        const block = document.createElement("div");
+        block.className = "vq-q";
+        block.innerHTML = `<p class="vq-text"><b>${qi + 1}.</b> ${esc(q.text)}</p>`;
+        (q.options || []).forEach((opt, oi) => {
+          const b = document.createElement("button");
+          b.className = "opt-btn small";
+          b.innerHTML = `<b>${String.fromCharCode(65 + oi)}.</b>&nbsp; ${esc(opt)}`;
+          b.onclick = () => {
+            if (checked) return;
+            picked[qi] = oi;
+            [...block.querySelectorAll(".opt-btn")].forEach((el, j) => el.classList.toggle("selected", j === oi));
+          };
+          block.appendChild(b);
+        });
+        host.appendChild(block);
+      });
+      const check = () => {
+        if (picked.some(p => p < 0)) { finishList(false, "", "Answer every question first."); return; }
+        checked = true;
+        let allOk = true;
+        host.querySelectorAll(".vq-q").forEach((block, qi) => {
+          block.querySelectorAll(".opt-btn").forEach((el, oi) => {
+            el.disabled = true;
+            if (oi === qs[qi].answerIndex) el.classList.add("correct");
+            else if (oi === picked[qi]) el.classList.add("wrong");
+          });
+          if (picked[qi] !== qs[qi].answerIndex) allOk = false;
+        });
+        finishList(allOk, "", `${qs.filter((q, i) => picked[i] === q.answerIndex).length} of ${qs.length} answers are correct.`);
+      };
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check answers</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineVideoQuiz);
+    }
+
+    /* sequence picker — used by video-sequence / reorder-text / timeline */
+    function engineSequence(items, doneMsg) {
+      const pool = shuffleArr(items.map((x, i) => ({ text: x, i })));
+      const placed = [];
+      body.innerHTML = `<div class="seq-placed"></div><div class="seq-pool"></div>`;
+      const hostP = body.querySelector(".seq-placed"), hostO = body.querySelector(".seq-pool");
+      const redraw = () => {
+        hostP.innerHTML = ""; hostO.innerHTML = "";
+        placed.forEach((it, n) => {
+          const el = document.createElement("div");
+          el.className = "match-item locked-ok seq-chip";
+          el.textContent = (n + 1) + ". " + it.text;
+          el.title = "Click to undo";
+          el.onclick = () => { placed.splice(n, 1); redraw(); };
+          hostP.appendChild(el);
+        });
+        pool.filter(it => placed.indexOf(it) < 0).forEach(it => {
+          const b = document.createElement("button");
+          b.className = "opt-btn small";
+          b.textContent = it.text;
+          b.onclick = () => {
+            placed.push(it); redraw();
+            if (placed.length === items.length) {
+              const ok = placed.every((p, n) => p.i === n);
+              finishList(ok, doneMsg || "", "Not quite \u2014 tap a placed item to remove it and try again.");
+            }
+          };
+          hostO.appendChild(b);
+        });
+      };
+      redraw();
+      resetEngineV2(() => engineSequence(items, doneMsg));
+    }
+    function engineVideoSequence() { engineSequence(task.items || [], ""); }
+
+    /* reading-truefalse — passage + statements */
+    function engineReadingTF() {
+      const st = task.statements || [];
+      body.innerHTML = `<div class="passage">${esc(task.passage || "").replace(/\n/g, "<br>")}</div>`;
+      const host = document.createElement("div");
+      body.appendChild(host);
+      const picked = new Array(st.length).fill(null);
+      let checked = false;
+      st.forEach((s, si) => {
+        const row = document.createElement("div");
+        row.className = "rt-row";
+        row.innerHTML = `<span class="rt-text">${si + 1}. ${esc(s.text)}</span>`;
+        [[true, "TRUE"], [false, "FALSE"]].forEach(([val]) => {
+          const b = document.createElement("button");
+          b.className = "tf-btn tiny";
+          b.textContent = val ? "TRUE \u2714" : "FALSE \u2718";
+          b._val = val;
+          b.onclick = () => {
+            if (checked) return;
+            picked[si] = val;
+            row.querySelectorAll(".tf-btn").forEach(el => el.classList.remove("selected"));
+            b.classList.add("selected");
+          };
+          row.appendChild(b);
+        });
+        host.appendChild(row);
+      });
+      const check = () => {
+        if (picked.some(p => p === null)) { finishList(false, "", "Judge every statement first."); return; }
+        checked = true;
+        let allOk = true;
+        host.querySelectorAll(".rt-row").forEach((row, si) => {
+          row.querySelectorAll(".tf-btn").forEach(el => {
+            el.disabled = true;
+            if (el._val === st[si].answer) el.classList.add("correct");
+            else if (picked[si] === el._val) el.classList.add("wrong");
+          });
+          if (picked[si] !== st[si].answer) allOk = false;
+        });
+        finishList(allOk, "", `${st.filter((s, i) => picked[i] === s.answer).length} of ${st.length} statements correct.`);
+      };
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineReadingTF);
+    }
+
+    /* short-answer — free typing vs accepted answers + model */
+    function engineShortAnswer() {
+      body.innerHTML = `<p class="sa-q">${esc(task.question || "")}</p>` +
+        (anyMedia("image") ? mediaPlayerHtml(anyMedia("image")) : "") +
+        `<div><textarea class="dict-area" rows="2" placeholder="Type your answer\u2026" autocomplete="off"></textarea></div>`;
+      const ta = body.querySelector(".dict-area");
+      const check = () => {
+        const v = _normAns(ta.value);
+        if (!v) { finishList(false, "", "Write an answer first."); return; }
+        const acc = (task.answers || []).map(_normAns);
+        const ok = acc.some(a => a === v || (a.length > 3 && v.indexOf(a) >= 0));
+        ta.disabled = true;
+        finishList(ok, (task.model ? "Model answer: " + task.model : ""),
+          "Accepted answer(s): " + (task.answers || []).join(" / ") + (task.model ? ". Model: " + task.model : ""));
+      };
+      ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); check(); } });
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineShortAnswer);
+    }
+
+    /* spelling — hear/see a prompt, type the word */
+    function engineSpelling() {
+      const m = anyMedia("audio");
+      body.innerHTML = (m ? mediaPlayerHtml(m) : "") +
+        `<p class="sp-prompt">${esc(task.prompt || "\ud83c\udfa7 Spell the word you hear:")}</p>` +
+        `<div><input class="gap-input sp-input" type="text" autocomplete="off" spellcheck="false"></div>`;
+      if (!m) body.insertAdjacentHTML("afterbegin", ttsBtn(task.word || ""));
+      wireTts(body);
+      const inp = body.querySelector(".sp-input");
+      inp.focus();
+      const check = () => {
+        const v = _normAns(inp.value);
+        if (!v) { finishList(false, "", "Type the word first."); return; }
+        const ok = v === _normAns(task.word);
+        inp.disabled = true;
+        finishList(ok, "", `Correct spelling: ${task.word}`);
+      };
+      inp.addEventListener("keydown", e => { if (e.key === "Enter") check(); });
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineSpelling);
+    }
+
+    /* multiple-select — choose ALL correct options */
+    function engineMultiSelect() {
+      const opts = task.options || [];
+      body.innerHTML = "<div class='ms-list'></div>";
+      const host = body.querySelector(".ms-list");
+      const sel = new Set();
+      let checked = false;
+      opts.forEach((o, i) => {
+        const b = document.createElement("button");
+        b.className = "opt-btn";
+        b.innerHTML = `\u2610&nbsp; ${esc(o.text)}`;
+        b.onclick = () => {
+          if (checked) return;
+          if (sel.has(i)) { sel.delete(i); b.classList.remove("selected"); b.innerHTML = `\u2610&nbsp; ${esc(o.text)}`; }
+          else { sel.add(i); b.classList.add("selected"); b.innerHTML = `\u2611&nbsp; ${esc(o.text)}`; }
+        };
+        host.appendChild(b);
+      });
+      const check = () => {
+        if (!sel.size) { finishList(false, "", "Select at least one option."); return; }
+        checked = true;
+        const correctIdx = new Set(opts.map((o, i) => o.correct ? i : -1).filter(i => i >= 0));
+        const allOk = sel.size === correctIdx.size && [...sel].every(i => correctIdx.has(i));
+        [...host.children].forEach((el, i) => {
+          el.disabled = true;
+          if (correctIdx.has(i)) el.classList.add("correct");
+          else if (sel.has(i)) el.classList.add("wrong");
+          else el.classList.add("dim");
+        });
+        finishList(allOk, "", `You found ${[...sel].filter(i => correctIdx.has(i)).length} of ${correctIdx.size} correct options.`);
+      };
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineMultiSelect);
+    }
+
+    /* reorder-text / timeline — click lines/events in the right order */
+    function engineReorderText() { engineSequence((task.lines || []), ""); }
+    function engineTimeline() {
+      const evs = task.events || [];
+      engineSequence(evs.map(e => e.label + (e.date ? " \u2014 " + e.date : "")), "");
+    }
+
+    /* categorize — assign every item to its category */
+    function engineCategorize() {
+      const cats = task.categories || [];
+      const items = shuffleArr(cats.reduce((acc, c, ci) => acc.concat(c.items.map(it => ({ text: it, ci }))), []));
+      const assign = new Array(items.length).fill(-1);
+      body.innerHTML = "<div class='cat-wrap'></div>";
+      const host = body.querySelector(".cat-wrap");
+      let pendingItem = null, checked = false;
+      const redraw = () => {
+        host.innerHTML = "";
+        const tray = document.createElement("div");
+        tray.className = "cat-tray";
+        items.forEach((it, ii) => {
+          if (assign[ii] >= 0) return;
+          const b = document.createElement("button");
+          b.className = "opt-btn small";
+          b.textContent = it.text;
+          b.onclick = () => {
+            if (checked) return;
+            host.querySelectorAll(".opt-btn.selected").forEach(el => el.classList.remove("selected"));
+            pendingItem = ii; b.classList.add("selected");
+          };
+          tray.appendChild(b);
+        });
+        if (!tray.children.length) tray.innerHTML = `<span class="ed-help">All items placed \u2014 press Check.</span>`;
+        host.appendChild(tray);
+        cats.forEach((c, ci) => {
+          const box = document.createElement("div");
+          box.className = "cat-box";
+          box._ci = ci;
+          box.innerHTML = `<h4>${esc(c.name)}</h4>`;
+          const listEl = document.createElement("div");
+          listEl.className = "cat-items";
+          items.forEach((it, ii) => {
+            if (assign[ii] !== ci) return;
+            const chip = document.createElement("button");
+            chip.className = "opt-btn small cat-chip";
+            chip.textContent = it.text;
+            chip.onclick = () => { if (checked) return; assign[ii] = -1; redraw(); };
+            listEl.appendChild(chip);
+          });
+          box.appendChild(listEl);
+          host.appendChild(box);
+        });
+      };
+      host.addEventListener("click", (e) => {
+        const box = e.target.closest(".cat-box");
+        if (box && pendingItem != null) { assign[pendingItem] = box._ci; pendingItem = null; redraw(); }
+      });
+      redraw();
+      const check = () => {
+        if (assign.some(a => a < 0)) { finishList(false, "", "Place every item into a category first."); return; }
+        checked = true;
+        const allOk = assign.every((a, i) => a === items[i].ci);
+        finishList(allOk, "", `${assign.filter((a, i) => a === items[i].ci).length} of ${items.length} items are in the right category.`);
+      };
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineCategorize);
+    }
+
+    /* crosswords — mini grid, clues across/down */
+    function engineCrosswords() {
+      const cells = task.cells || [], clues = task.clues || [];
+      if (!cells.length || !clues.length) {
+        body.innerHTML = `<div class="error-box">This crossword has no data.</div>`;
+        if (btnNext) btnNext.disabled = false;
+        return;
+      }
+      let minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+      cells.forEach(c => { minX = Math.min(minX, c.x); minY = Math.min(minY, c.y); maxX = Math.max(maxX, c.x); maxY = Math.max(maxY, c.y); });
+      const W = maxX - minX + 1, H = maxY - minY + 1;
+      const filled = {};
+      cells.forEach(c => { filled[(c.x - minX) + "," + (c.y - minY)] = 1; });
+      const words = {};
+      clues.forEach(cl => {
+        let found = false;
+        for (let y = 0; y < H && !found; y++) for (let x = 0; x < W && !found; x++) {
+          if (!filled[x + "," + y]) continue;
+          const dx = cl.dir === "across" ? 1 : 0, dy = cl.dir === "down" ? 1 : 0;
+          let fits = true;
+          for (let k = 0; k < cl.word.length; k++) if (!filled[(x + dx * k) + "," + (y + dy * k)]) { fits = false; break; }
+          if (!fits) continue;
+          if (filled[(x - dx) + "," + (y - dy)]) continue;
+          if (filled[(x + dx * cl.word.length) + "," + (y + dy * cl.word.length)]) continue;
+          for (let k = 0; k < cl.word.length; k++) words[(x + dx * k) + "," + (y + dy * k)] = cl.word[k];
+          found = true;
+        }
+      });
+      body.innerHTML = `<div class="cw-grid" style="--cw:${W}"></div><div class="cw-clues"></div>`;
+      const gridEl = body.querySelector(".cw-grid");
+      const ins = {};
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const key = x + "," + y;
+        if (!filled[key]) { gridEl.insertAdjacentHTML("beforeend", `<span class="cw-blank"></span>`); continue; }
+        const inp = document.createElement("input");
+        inp.maxLength = 1; inp.autocomplete = "off"; inp.spellcheck = false;
+        gridEl.appendChild(inp); ins[key] = inp;
+      }
+      const clueHost = body.querySelector(".cw-clues");
+      clueHost.innerHTML = clues.map((cl, i) =>
+        `<div class="cw-clue"><b>${i + 1} (${cl.dir === "across" ? "\u2192" : "\u2193"})</b> ${esc(cl.clue || "")}</div>`).join("");
+      const check = () => {
+        let allFilled = true, allOk = true;
+        Object.keys(ins).forEach(key => {
+          const inp = ins[key];
+          const v = (inp.value || "").toUpperCase();
+          if (!v) allFilled = false;
+          const good = v === words[key];
+          inp.classList.toggle("correct", good);
+          inp.classList.toggle("wrong", !good && !!v);
+          if (!good) allOk = false;
+        });
+        if (!allFilled) { finishList(false, "", "Fill every cell first."); return; }
+        Object.values(ins).forEach(inp => { inp.disabled = true; });
+        finishList(allOk, "", "Some letters are in the wrong cells.");
+      };
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineCrosswords);
+    }
+
+    /* sentence-transform — rewrite as instructed */
+    function engineSentenceTransform() {
+      body.innerHTML = `<p class="st-src">${esc(task.source || "")}</p>` +
+        (task.task ? `<p class="ed-help">${esc(task.task)}</p>` : "") +
+        `<div><textarea class="dict-area" rows="2" placeholder="Rewrite the sentence\u2026" autocomplete="off"></textarea></div>`;
+      const ta = body.querySelector(".dict-area");
+      const check = () => {
+        const v = _normAns(ta.value);
+        if (!v) { finishList(false, "", "Write the transformed sentence first."); return; }
+        const acc = (task.answers || []).map(_normAns);
+        const ok = acc.some(a => a === v || (a.length > 4 && (v.indexOf(a) >= 0 || a.indexOf(v) >= 0)));
+        ta.disabled = true;
+        finishList(ok, "", "Expected: " + (task.answers || []).join(" / "));
+      };
+      ta.addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); check(); } });
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineSentenceTransform);
+    }
+
+    /* error-correction — click the wrong word, then fix it */
+    function engineErrorCorrection() {
+      const toks = String(task.sentence || "").split(/\s+/).filter(Boolean);
+      body.innerHTML = `<div class="ec-sent"></div>`;
+      const host = body.querySelector(".ec-sent");
+      let picked = -1, checked = false;
+      toks.forEach((tk, i) => {
+        const b = document.createElement("button");
+        b.className = "opt-btn tiny ec-word";
+        b.textContent = tk;
+        b.onclick = () => {
+          if (checked) return;
+          picked = i;
+          host.querySelectorAll(".ec-word").forEach(el => el.classList.remove("selected"));
+          b.classList.add("selected");
+          fixRow.style.display = "flex"; fixInput.focus();
+        };
+        host.appendChild(b);
+      });
+      const fixRow = document.createElement("div");
+      fixRow.className = "row-actions";
+      fixRow.style.display = "none";
+      const fixInput = document.createElement("input");
+      fixInput.className = "gap-input"; fixInput.placeholder = "type the correct word";
+      const fixBtn = document.createElement("button");
+      fixBtn.className = "btn-primary opt-btn"; fixBtn.textContent = "Fix it";
+      fixRow.append(fixInput, fixBtn);
+      body.appendChild(fixRow);
+      fixBtn.onclick = () => {
+        if (picked < 0 || checked) return;
+        checked = true;
+        const wordOk = picked === task.wrongIndex;
+        const want = _normAns(task.fix || toks[task.wrongIndex]);
+        const got = _normAns(fixInput.value);
+        const fixOk = !task.fix || got === want || (want.length > 2 && got.indexOf(want) >= 0);
+        host.querySelectorAll(".ec-word").forEach((el, i) => {
+          el.disabled = true;
+          if (i === task.wrongIndex) el.classList.add(wordOk ? "correct" : "wrong");
+          else if (i === picked && !wordOk) el.classList.add("wrong");
+        });
+        fixInput.disabled = true;
+        finishList(wordOk && fixOk, "", `The mistake was \u201c${toks[task.wrongIndex]}\u201d \u2192 \u201c${task.fix || ""}\u201d.`);
+      };
+      resetEngineV2(engineErrorCorrection);
+    }
+
+    /* initials — type words from their first letters */
+    function engineInitials() {
+      const items = task.items || [];
+      body.innerHTML = (anyMedia("image") ? mediaPlayerHtml(anyMedia("image")) : "") +
+        `<div class="ini-list"></div>`;
+      const host = body.querySelector(".ini-list");
+      const inputs = [];
+      items.forEach((it, i) => {
+        const row = document.createElement("div");
+        row.className = "ed-gaprow ini-row";
+        const label = document.createElement("span");
+        label.className = "ini-label";
+        label.textContent = (it.initial || (it.word || "?")[0]) + "\u2026\u2026\u2026";
+        const inp = document.createElement("input");
+        inp.className = "gap-input"; inp.autocomplete = "off";
+        inputs.push(inp);
+        row.append(label, inp);
+        host.appendChild(row);
+      });
+      const check = () => {
+        let allFilled = true, allOk = true;
+        inputs.forEach((inp, i) => {
+          const v = _normAns(inp.value);
+          if (!v) allFilled = false;
+          const ok = v === _normAns(items[i].word);
+          inp.classList.toggle("correct", ok);
+          inp.classList.toggle("wrong", !ok);
+          if (!ok) allOk = false;
+        });
+        if (!allFilled) { finishList(false, "", "Type every word first."); return; }
+        inputs.forEach(inp => { inp.disabled = true; });
+        finishList(allOk, "", "Check the highlighted words.");
+      };
+      body.insertAdjacentHTML("beforeend", `<div class="row-actions"><button class="btn-primary opt-btn" type="button">Check</button></div>`);
+      body.querySelector(".row-actions button").onclick = check;
+      resetEngineV2(engineInitials);
+    }
+
+    /* choose-picture — read/listen to a prompt, click the right picture */
+    function engineChoosePicture() {
+      const pics = task.images || [];
+      const ma = anyMedia("audio");
+      body.innerHTML = `<p class="cp-prompt">${esc(task.prompt || "")}</p>` + (ma ? mediaPlayerHtml(ma) : "") + `<div class="cp-grid"></div>`;
+      const host = body.querySelector(".cp-grid");
+      let locked = false;
+      shuffleArr(pics).forEach(p => {
+        const fig = document.createElement("button");
+        fig.className = "cp-card";
+        fig.innerHTML = `<img loading="lazy" src="${esc(p.src)}" alt="${esc(p.caption || "")}">` +
+          (p.caption ? `<figcaption>${esc(p.caption)}</figcaption>` : "");
+        fig._correct = !!p.correct;
+        fig.onclick = () => {
+          if (locked) return;
+          locked = true;
+          host.querySelectorAll(".cp-card").forEach(el => {
+            el.disabled = true;
+            if (el._correct) el.classList.add("correct");
+          });
+          if (!fig._correct) fig.classList.add("wrong");
+          setFeedback(fig._correct, fig._correct ? (task.explanation || "") : (task.explanation || "Look again at the prompt."));
+        };
+        host.appendChild(fig);
+      });
+      resetEngineV2(engineChoosePicture);
+    }
+
+    /* definition-match — matching variant with definitions */
+    function engineDefinitionMatch() { engineMatch(); }
+
+    /* memory-pairs — flip cards, find pairs */
+    function engineMemoryPairs() {
+      const pairs = task.pairs || [];
+      const cards = shuffleArr(pairs.reduce((acc, p, i) => acc.concat([{ t: p.front, pid: i }, { t: p.back, pid: i }]), []));
+      let openEl = null, busy = false, found = 0, mistakes = 0;
+      body.innerHTML = `<div class="mp-grid" style="--mp:${Math.min(cards.length, 4)}"></div>`;
+      const host = body.querySelector(".mp-grid");
+      cards.forEach(c => {
+        const b = document.createElement("button");
+        b.className = "mp-card";
+        b.textContent = "?";
+        b.onclick = () => {
+          if (busy || b.classList.contains("locked-ok") || b === openEl) return;
+          b.classList.add("open"); b.textContent = c.t;
+          if (!openEl) { openEl = b; openEl._c = c; return; }
+          busy = true;
+          const a = openEl; openEl = null;
+          if (a._c.pid === c.pid) {
+            a.classList.add("locked-ok"); b.classList.add("locked-ok");
+            found++;
+            if (found === pairs.length) finishList(mistakes === 0, "", `Done in ${mistakes + found} tries (${mistakes} mismatch(es)).`);
+            busy = false;
+          } else {
+            mistakes++;
+            a.classList.add("locked-bad"); b.classList.add("locked-bad");
+            setTimeout(() => {
+              [a, b].forEach(el => { el.classList.remove("open", "locked-bad"); el.textContent = "?"; });
+              busy = false;
+            }, 700);
+          }
+        };
+        host.appendChild(b);
+      });
+      resetEngineV2(engineMemoryPairs);
+    }
+
+    /* speaking-repeat — listen to a model, record, self-assess */
+    function engineSpeakingRepeat() {
+      body.innerHTML = `<p class="sr-text">\u201c${esc(task.modelText || "")}\u201d</p>` + ttsBtn(task.modelText || "") +
+        `<div class="row-actions sr-actions"></div>`;
+      wireTts(body);
+      const actions = body.querySelector(".sr-actions");
+      let stream = null, rec = null, chunks = [], recording = false;
+      const recBtn = document.createElement("button");
+      recBtn.className = "opt-btn btn-primary"; recBtn.textContent = "\ud83c\udfa4 Start recording";
+      const playWrap = document.createElement("span");
+      actions.append(recBtn, playWrap);
+      recBtn.onclick = async () => {
+        if (recording) {
+          recording = false;
+          recBtn.textContent = "\ud83c\udfa4 Start recording";
+          if (rec && rec.state !== "inactive") rec.stop();
+          return;
+        }
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        } catch (e) {
+          alert("Microphone unavailable \u2014 you can still use \u201cI nailed it\u201d below.");
+          showSelfAssess(); return;
+        }
+        chunks = [];
+        rec = new MediaRecorder(stream);
+        rec.ondataavailable = ev => chunks.push(ev.data);
+        rec.onstop = () => {
+          stream.getTracks().forEach(t => t.stop());
+          const url = URL.createObjectURL(new Blob(chunks, { type: "audio/webm" }));
+          playWrap.innerHTML = `<audio controls src="${url}"></audio>`;
+          showSelfAssess();
+        };
+        rec.start(); recording = true;
+        recBtn.textContent = "\u23f9 Stop & listen";
+      };
+      function showSelfAssess() {
+        if (body.querySelector(".sr-rate")) return;
+        const rate = document.createElement("div");
+        rate.className = "row-actions sr-rate";
+        const okB = document.createElement("button");
+        okB.className = "opt-btn btn-primary"; okB.textContent = "\u2705 I nailed it";
+        const noB = document.createElement("button");
+        noB.className = "opt-btn"; noB.textContent = "\u2754 Try again";
+        okB.onclick = () => finishList(true, "Great speaking!");
+        noB.onclick = () => { renderEngine.reset(); };
+        rate.append(okB, noB);
+        body.appendChild(rate);
+      }
+      resetEngineV2(engineSpeakingRepeat);
+    }
+
     switch (task.type) {
       case "multiple-choice": engineMC(); break;
       case "true-false": engineTF(); break;
@@ -1248,6 +1958,26 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
       case "click-on-picture": enginePicture(); break;
       case "word-search": engineWordSearch(); break;
       case "translate-match": engineTranslateMatch(); break;
+      case "listen-choice": engineListenChoice(); break;
+      case "dictation": engineDictation(); break;
+      case "listen-gap": engineListenGap(); break;
+      case "video-quiz": engineVideoQuiz(); break;
+      case "video-sequence": engineVideoSequence(); break;
+      case "reading-truefalse": engineReadingTF(); break;
+      case "short-answer": engineShortAnswer(); break;
+      case "spelling": engineSpelling(); break;
+      case "multiple-select": engineMultiSelect(); break;
+      case "reorder-text": engineReorderText(); break;
+      case "categorize": engineCategorize(); break;
+      case "crosswords": engineCrosswords(); break;
+      case "sentence-transform": engineSentenceTransform(); break;
+      case "error-correction": engineErrorCorrection(); break;
+      case "initials": engineInitials(); break;
+      case "choose-picture": engineChoosePicture(); break;
+      case "timeline": engineTimeline(); break;
+      case "definition-match": engineDefinitionMatch(); break;
+      case "memory-pairs": engineMemoryPairs(); break;
+      case "speaking-repeat": engineSpeakingRepeat(); break;
       default:
         body.innerHTML = `<div class="error-box">Task type \u201c${esc(task.type)}\u201d is not supported yet.</div>`;
         if (btnNext) btnNext.disabled = false;

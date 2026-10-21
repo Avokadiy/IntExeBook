@@ -28,7 +28,28 @@
     { type: "find-and-click", icon: "🔍", label: "Find & click", hint: "Click the required words inside a sentence or text." },
     { type: "click-on-picture", icon: "🖱️", label: "Click on the picture", hint: "Click marked spots on an image (hotspots)." },
     { type: "word-search", icon: "🔠", label: "Word search", hint: "Find hidden words in a letter grid." },
-    { type: "translate-match", icon: "🌍", label: "Translate & match", hint: "Two-column matching with a translation twist." }
+    { type: "translate-match", icon: "🌍", label: "Translate & match", hint: "Two-column matching with a translation twist." },
+    /* --- extended set (v2): audio / video / text skills, 20 new types --- */
+    { type: "listen-choice", icon: "🎧", label: "Listen & choose", hint: "Audio clip plus a multiple-choice question." },
+    { type: "dictation", icon: "👂", label: "Dictation", hint: "Listen to the audio and type exactly what you hear." },
+    { type: "listen-gap", icon: "🎼", label: "Listen & fill gaps", hint: "Song or dialogue lyrics with blanks to complete while listening." },
+    { type: "video-quiz", icon: "🎬", label: "Video quiz", hint: "Watch a video clip and answer questions about it." },
+    { type: "video-sequence", icon: "📽️", label: "Order the video events", hint: "Put scenes / moments of a video in the right order." },
+    { type: "reading-truefalse", icon: "📖", label: "Reading true / false", hint: "Read a passage, then judge statements as true or false." },
+    { type: "short-answer", icon: "💬", label: "Short answer", hint: "Type a free answer — the student checks it against a model." },
+    { type: "spelling", icon: "🔡", label: "Spelling", hint: "Hear or see a prompt and type the word correctly." },
+    { type: "multiple-select", icon: "☑️", label: "Multiple select", hint: "Choose ALL correct options among several." },
+    { type: "reorder-text", icon: "🪜", label: "Reorder the text", hint: "Restore a dialogue or paragraph — put the lines back in order." },
+    { type: "categorize", icon: "🗂️", label: "Categorize", hint: "Drag every item into its correct category box." },
+    { type: "crosswords", icon: "➕", label: "Crosswords", hint: "Mini crossword — clues across and down share letters." },
+    { type: "sentence-transform", icon: "🔁", label: "Transform the sentence", hint: "Rewrite the sentence as instructed (keep the meaning)." },
+    { type: "error-correction", icon: "🩹", label: "Find the mistake", hint: "One word in the sentence is wrong — click it and fix it." },
+    { type: "initials", icon: "🔤", label: "First letters", hint: "Type words that start with the given letters (1st-letter prompts)." },
+    { type: "choose-picture", icon: "🌄", label: "Choose the picture", hint: "Read / listen to a prompt and click the matching picture." },
+    { type: "timeline", icon: "🕰️", label: "Timeline", hint: "Arrange events on a timeline from earliest to latest." },
+    { type: "definition-match", icon: "📚", label: "Definition match", hint: "Match each word with its definition." },
+    { type: "memory-pairs", icon: "🧠", label: "Memory pairs", hint: "Flip cards face-down and find all matching pairs." },
+    { type: "speaking-repeat", icon: "🎙️", label: "Speak & record", hint: "Listen to a model, record your voice and compare." }
   ];
   var TYPE_IDS = TASK_TYPES.map(function (t) { return t.type; });
 
@@ -45,6 +66,27 @@
       case "click-on-picture": return { image: "", hotspots: [] };
       case "word-search": return { words: ["CAT", "DOG"], grid: [], note: "" };
       case "translate-match": return { pairs: [{ left: "", right: "" }, { left: "", right: "" }] };
+      /* --- extended set (v2) starters --- */
+      case "listen-choice": return { options: ["", ""], answerIndex: 0 };
+      case "dictation": return { text: "" };
+      case "listen-gap": return { text: "He ___ me yesterday.", blanks: [{ answers: ["called"] }] };
+      case "video-quiz": return { questions: [{ text: "", options: ["", ""], answerIndex: 0 }] };
+      case "video-sequence": return { items: ["", "", ""] };
+      case "reading-truefalse": return { passage: "", statements: [{ text: "", answer: true }, { text: "", answer: false }] };
+      case "short-answer": return { question: "", answers: [""], model: "" };
+      case "spelling": return { word: "", prompt: "" };
+      case "multiple-select": return { options: [{ text: "", correct: true }, { text: "", correct: false }, { text: "", correct: false }] };
+      case "reorder-text": return { lines: ["", "", ""] };
+      case "categorize": return { categories: [{ name: "", items: [""] }, { name: "", items: [""] }] };
+      case "crosswords": return { cells: [], clues: [] };
+      case "sentence-transform": return { source: "", task: "", answers: [""] };
+      case "error-correction": return { sentence: "", wrongIndex: 0, fix: "" };
+      case "initials": return { items: [{ word: "", initial: "" }] };
+      case "choose-picture": return { prompt: "", images: [{ src: "", caption: "", correct: true }, { src: "", caption: "", correct: false }] };
+      case "timeline": return { events: [{ label: "", date: "" }, { label: "", date: "" }] };
+      case "definition-match": return { pairs: [{ left: "", right: "" }, { left: "", right: "" }] };
+      case "memory-pairs": return { pairs: [{ front: "", back: "" }, { front: "", back: "" }] };
+      case "speaking-repeat": return { modelText: "" };
       default: return {};
     }
   }
@@ -232,6 +274,226 @@
         else { tmSeen[norm(l)] = 1; tmClean.push({ left: l, right: r }); }
       });
       out.pairs = tmClean;
+    } else if (type === "listen-choice") {
+      var lcOpts = Array.isArray(raw.options) ? raw.options.map(str) : [];
+      if (lcOpts.filter(Boolean).length < 2) err("needs at least 2 answer options");
+      var lcAi = parseInt(raw.answerIndex, 10);
+      if (!(lcAi >= 0 && lcAi < lcOpts.length)) err("no correct option marked");
+      if (!(Array.isArray(raw.media) && raw.media.length)) warnings.push("attach an audio clip in the Media tab — this is a listening task");
+      out.options = lcOpts;
+      out.answerIndex = isNaN(lcAi) ? -1 : lcAi;
+    } else if (type === "dictation") {
+      var dicText = str(raw.text);
+      if (!dicText) err("the dictation text (what the student should type) is empty");
+      out.text = dicText;
+      if (!(Array.isArray(raw.media) && raw.media.length)) warnings.push("attach an audio clip in the Media tab — this is a listening task");
+    } else if (type === "listen-gap") {
+      var lgText = str(raw.text);
+      var lgGaps = (lgText.match(/_{2,}/g) || []).length;
+      var lgBlanks = Array.isArray(raw.blanks) ? raw.blanks : [];
+      if (!lgText) err("the lyrics / sentence text is empty");
+      if (!lgGaps) err("no gaps found — use ___ in the text");
+      if (lgGaps && lgBlanks.length !== lgGaps) err(lgGaps + " gap(s) in the text but " + lgBlanks.length + " answer(s) given");
+      var lgClean = [];
+      lgBlanks.forEach(function (b, i) {
+        var ans = isObj(b) ? (Array.isArray(b.answers) ? b.answers : []) : [];
+        var list = ans.map(str).filter(Boolean);
+        if (!list.length) err("gap " + (i + 1) + " has no accepted answer");
+        var hint = isObj(b) ? str(b.hint) : "";
+        lgClean.push(hint ? { answers: list, hint: hint } : { answers: list });
+      });
+      out.text = lgText;
+      out.blanks = lgClean;
+      if (!(Array.isArray(raw.media) && raw.media.length)) warnings.push("attach an audio clip in the Media tab — this is a listening task");
+    } else if (type === "video-quiz") {
+      var vqList = Array.isArray(raw.questions) ? raw.questions : [];
+      if (!vqList.length) err("add at least one question about the video");
+      var vqClean = [];
+      vqList.forEach(function (q, i) {
+        var qt = isObj(q) ? str(q.text) : "";
+        var qo = isObj(q) && Array.isArray(q.options) ? q.options.map(str) : [];
+        var qa = isObj(q) ? parseInt(q.answerIndex, 10) : -1;
+        if (!qt) err("question " + (i + 1) + " has no text");
+        if (qo.filter(Boolean).length < 2) err("question " + (i + 1) + " needs at least 2 options");
+        if (!(qa >= 0 && qa < qo.length)) err("question " + (i + 1) + " has no correct option marked");
+        vqClean.push({ text: qt, options: qo, answerIndex: isNaN(qa) ? -1 : qa });
+      });
+      out.questions = vqClean;
+      if (!(Array.isArray(raw.media) && raw.media.some(function (m) { return m.type === "video"; })))
+        warnings.push("attach a video clip in the Media tab");
+    } else if (type === "video-sequence") {
+      var vsItems = Array.isArray(raw.items) ? raw.items.map(str).filter(Boolean) : [];
+      if (vsItems.length < 3) err("needs at least 3 events to order");
+      out.items = vsItems;
+    } else if (type === "reading-truefalse") {
+      var rtPassage = str(raw.passage);
+      if (!rtPassage) err("the reading passage is empty");
+      var rtSt = Array.isArray(raw.statements) ? raw.statements : [];
+      if (rtSt.length < 2) err("add at least 2 statements");
+      var rtClean = [];
+      rtSt.forEach(function (s, i) {
+        var st = isObj(s) ? str(s.text) : "";
+        if (!st) { err("statement " + (i + 1) + " is empty"); return; }
+        if (typeof (isObj(s) ? s.answer : undefined) !== "boolean") err("statement " + (i + 1) + " must be marked true or false");
+        rtClean.push({ text: st, answer: !!(isObj(s) && s.answer) });
+      });
+      out.passage = rtPassage;
+      out.statements = rtClean;
+    } else if (type === "short-answer") {
+      var saQ = str(raw.question);
+      var saAns = Array.isArray(raw.answers) ? raw.answers.map(str).filter(Boolean) : [];
+      if (!saQ) err("the question is empty");
+      if (!saAns.length) err("add at least one accepted answer");
+      out.question = saQ;
+      out.answers = saAns;
+      if (str(raw.model)) out.model = str(raw.model);
+    } else if (type === "spelling") {
+      var spWord = str(raw.word);
+      if (!spWord) err("the target word is empty");
+      if (/[.,!?]/.test(spWord)) err("the word itself should not contain punctuation");
+      out.word = spWord;
+      if (str(raw.prompt)) out.prompt = str(raw.prompt);
+    } else if (type === "multiple-select") {
+      var msRaw = Array.isArray(raw.options) ? raw.options : [];
+      var msClean = [];
+      msRaw.forEach(function (o, i) {
+        var t = isObj(o) ? str(o.text) : str(o);
+        if (!t) { err("option " + (i + 1) + " is empty"); return; }
+        msClean.push({ text: t, correct: isObj(o) ? !!o.correct : false });
+      });
+      if (msClean.length < 3) err("needs at least 3 options");
+      var msOk = msClean.filter(function (o) { return o.correct; }).length;
+      if (!msOk) err("mark at least one option as correct");
+      if (msOk >= msClean.length) err("keep at least one wrong option");
+      out.options = msClean;
+    } else if (type === "reorder-text") {
+      var roLines = Array.isArray(raw.lines) ? raw.lines.map(str).filter(Boolean) : [];
+      if (roLines.length < 3) err("needs at least 3 lines in the correct order");
+      out.lines = roLines;
+    } else if (type === "categorize") {
+      var cgCats = Array.isArray(raw.categories) ? raw.categories : [];
+      if (cgCats.length < 2) err("needs at least 2 categories");
+      var cgClean = [], cgNames = {};
+      cgCats.forEach(function (c, i) {
+        var name = isObj(c) ? str(c.name) : "";
+        var items = isObj(c) && Array.isArray(c.items) ? c.items.map(str).filter(Boolean) : [];
+        if (!name) err("category " + (i + 1) + " has no name");
+        else if (cgNames[norm(name)]) err("duplicate category “" + name + "”");
+        else if (!items.length) err("category “" + name + "” has no items");
+        else { cgNames[norm(name)] = 1; cgClean.push({ name: name, items: items }); }
+      });
+      var cgTotal = cgClean.reduce(function (n, c) { return n + c.items.length; }, 0);
+      if (cgTotal < 3) err("add at least 3 items in total");
+      out.categories = cgClean;
+    } else if (type === "crosswords") {
+      var cwCells = Array.isArray(raw.cells) ? raw.cells : [];
+      var cwClues = Array.isArray(raw.clues) ? raw.clues : [];
+      if (!cwCells.length) err("draw the grid first — click cells in the editor preview (or use the generator)");
+      if (cwClues.length < 2) err("add at least 2 clues");
+      var cwClean = [];
+      cwClues.forEach(function (cl, i) {
+        var w = isObj(cl) ? String(cl.word || "").toUpperCase().replace(/[^A-ZА-ЯЁ]/g, "") : "";
+        var d = isObj(cl) ? str(cl.dir) : "";
+        var q = isObj(cl) ? str(cl.clue) : "";
+        if (!w || ["across", "down"].indexOf(d) < 0 || !q) err("clue " + (i + 1) + ": word, direction (across/down) and clue text are required");
+        else cwClean.push({ word: w, dir: d, clue: q });
+      });
+      var cwGrid = {};
+      cwCells.forEach(function (c) { if (isObj(c)) cwGrid[c.x + "," + c.y] = 1; });
+      cwClean.forEach(function (cl) {
+        var placed = false;
+        Object.keys(cwGrid).forEach(function (key) {
+          if (placed) return;
+          var xy = key.split(","), sx = parseInt(xy[0], 10), sy = parseInt(xy[1], 10);
+          var dx = cl.dir === "across" ? 1 : 0, dy = cl.dir === "down" ? 1 : 0;
+          for (var k = 0; k < cl.word.length; k++) {
+            if (!cwGrid[(sx + dx * k) + "," + (sy + dy * k)]) return;
+          }
+          placed = true;
+        });
+        if (!placed) err("word “" + cl.word + "” does not fit into the drawn grid");
+      });
+      out.cells = cwCells.map(function (c) { return { x: parseInt(c.x, 10) || 0, y: parseInt(c.y, 10) || 0 }; });
+      out.clues = cwClean;
+    } else if (type === "sentence-transform") {
+      var stSrc = str(raw.source);
+      var stAns = Array.isArray(raw.answers) ? raw.answers.map(str).filter(Boolean) : [];
+      if (!stSrc) err("the source sentence is empty");
+      if (!stAns.length) err("add at least one accepted transformed sentence");
+      out.source = stSrc;
+      if (str(raw.task)) out.task = str(raw.task);
+      out.answers = stAns;
+    } else if (type === "error-correction") {
+      var ecSent = str(raw.sentence);
+      var ecTok = ecSent.split(/\s+/).filter(Boolean);
+      var ecIdx = parseInt(raw.wrongIndex, 10);
+      if (!ecSent) err("the sentence is empty");
+      if (ecTok.length < 3) err("the sentence needs at least 3 words");
+      if (!(ecIdx >= 0 && ecIdx < ecTok.length)) err("mark which word is wrong (click it in the editor preview)");
+      out.sentence = ecSent;
+      out.wrongIndex = isNaN(ecIdx) ? -1 : ecIdx;
+      if (str(raw.fix)) out.fix = str(raw.fix);
+    } else if (type === "initials") {
+      var iniItems = Array.isArray(raw.items) ? raw.items : [];
+      var iniClean = [];
+      iniItems.forEach(function (it, i) {
+        var w = isObj(it) ? str(it.word) : "";
+        if (!w) { err("item " + (i + 1) + " has no word"); return; }
+        iniClean.push({ word: w, initial: (isObj(it) && str(it.initial)) ? str(it.initial)[0].toLowerCase() : w[0].toLowerCase() });
+      });
+      if (iniClean.length < 2) err("add at least 2 words");
+      out.items = iniClean;
+    } else if (type === "choose-picture") {
+      var cpPics = Array.isArray(raw.images) ? raw.images : [];
+      if (cpPics.length < 2) err("add at least 2 pictures");
+      var cpClean2 = [], cpOk = 0;
+      cpPics.forEach(function (p, i) {
+        var src = isObj(p) ? str(p.src) : "";
+        if (!src) { err("picture " + (i + 1) + " is missing — upload images in the Content form"); return; }
+        var ok = isObj(p) ? !!p.correct : false;
+        if (ok) cpOk++;
+        cpClean2.push({ src: src, caption: isObj(p) ? str(p.caption) : "", correct: ok });
+      });
+      if (!cpOk) err("mark one picture as the correct answer");
+      if (cpOk >= cpClean2.length) err("keep at least one wrong picture");
+      if (!str(raw.prompt)) err("the prompt (question / word the student matches) is empty");
+      out.prompt = str(raw.prompt);
+      out.images = cpClean2;
+    } else if (type === "timeline") {
+      var tlEv = Array.isArray(raw.events) ? raw.events : [];
+      if (tlEv.length < 3) err("needs at least 3 events");
+      var tlClean = [];
+      tlEv.forEach(function (e, i) {
+        var lab = isObj(e) ? str(e.label) : "", dt = isObj(e) ? str(e.date) : "";
+        if (!lab) err("event " + (i + 1) + " has no label");
+        else tlClean.push({ label: lab, date: dt || undefined });
+      });
+      out.events = tlClean;
+    } else if (type === "definition-match") {
+      var dmPairs = Array.isArray(raw.pairs) ? raw.pairs : [];
+      if (dmPairs.length < 2) err("needs at least 2 word/definition pairs");
+      var dmSeen = {}, dmClean = [];
+      dmPairs.forEach(function (p, i) {
+        var l = isObj(p) ? str(p.left) : "", r = isObj(p) ? str(p.right) : "";
+        if (!l || !r) err("pair " + (i + 1) + " is incomplete (word + definition needed)");
+        else if (dmSeen[norm(l)]) err("duplicate word “" + l + "”");
+        else { dmSeen[norm(l)] = 1; dmClean.push({ left: l, right: r }); }
+      });
+      out.pairs = dmClean;
+    } else if (type === "memory-pairs") {
+      var mpPairs = Array.isArray(raw.pairs) ? raw.pairs : [];
+      if (mpPairs.length < 3) err("needs at least 3 card pairs");
+      var mpClean = [];
+      mpPairs.forEach(function (p, i) {
+        var f = isObj(p) ? str(p.front) : "", b = isObj(p) ? str(p.back) : "";
+        if (!f || !b) err("pair " + (i + 1) + " is incomplete (front + back needed)");
+        else mpClean.push({ front: f, back: b });
+      });
+      out.pairs = mpClean;
+    } else if (type === "speaking-repeat") {
+      var srText = str(raw.modelText);
+      if (!srText) err("the model phrase the student repeats is empty");
+      out.modelText = srText;
     }
 
     return { ok: errors.length === 0, errors: errors, warnings: warnings, value: out };
@@ -598,6 +860,33 @@
       if (grid[ry][rx] === "") grid[ry][rx] = alpha[Math.floor(Math.random() * 26)];
     }
     return { ok: placedAll, rows: grid.map(function (row) { return row.join(""); }) };
+  }
+
+  /* mini crossword layout builder used by the authoring editor:
+     words run across; every second word also runs down from its first
+     letter. Returns { ok, cells:[{x,y}], clues:[{word,dir,clue}] }. */
+  function generateCrosswords(words) {
+    var list = (words || []).map(function (w) {
+      return String(w || "").toUpperCase().replace(/[^A-ZА-ЯЁ]/g, "");
+    }).filter(Boolean).slice(0, 6);
+    if (list.length < 2) return { ok: false, cells: [], clues: [] };
+    var cells = {}, clues = [];
+    function addCell(x, y) { cells[x + "," + y] = 1; }
+    var y = 0;
+    list.forEach(function (w, i) {
+      for (var k = 0; k < w.length; k++) addCell(k, y);
+      clues.push({ word: w, dir: "across", clue: "" });
+      if (i % 2 === 1) {
+        for (var d = 0; d < w.length; d++) addCell(0, y + d);
+        clues.push({ word: w, dir: "down", clue: "" });
+      }
+      y += w.length > 3 ? 2 : 3;
+    });
+    var out = Object.keys(cells).map(function (key) {
+      var xy = key.split(",");
+      return { x: parseInt(xy[0], 10), y: parseInt(xy[1], 10) };
+    });
+    return { ok: true, cells: out, clues: clues };
   }
 
   /* =====================================================================
@@ -1121,6 +1410,7 @@
     FORMAT_VERSION: FORMAT_VERSION,
     TASK_TYPES: TASK_TYPES, TYPE_IDS: TYPE_IDS, MEDIA_ICONS: MEDIA_ICONS,
     defaultTask: defaultTask, blankTask: blankTask, generateWordGrid: generateWordGrid,
+    generateCrosswords: generateCrosswords,
     slugify: slugify, makeId: makeId,
     validateTask: validateTask, validateBook: validateBook, validateManifest: validateManifest,
     buildPack: buildPack, readPack: readPack,
