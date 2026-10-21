@@ -1,0 +1,514 @@
+{
+  "format": 1,
+  "units": [
+    {
+      "id": "u1",
+      "title": "Unit 1 – All Task Types",
+      "lessons": [
+        {
+          "id": "l1",
+          "title": "Lesson 1 – Showcase",
+          "tasks": [
+            {
+              "id": "t1",
+              "type": "categorize",
+              "title": "1. categorize",
+              "instruction": "Sort the items into the right categories.",
+              "categories": [
+                {
+                  "name": "Fruits",
+                  "items": [
+                    "apple",
+                    "banana"
+                  ]
+                },
+                {
+                  "name": "Vehicles",
+                  "items": [
+                    "car"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "t2",
+              "type": "choose-odd-one-out",
+              "title": "2. choose-odd-one-out",
+              "instruction": "Which item does not belong to the group?",
+              "options": [
+                {
+                  "text": "red",
+                  "isOdd": false
+                },
+                {
+                  "text": "blue",
+                  "isOdd": false
+                },
+                {
+                  "text": "table",
+                  "isOdd": true
+                }
+              ],
+              "categoryHint": "colours"
+            },
+            {
+              "id": "t3",
+              "type": "choose-picture",
+              "title": "3. choose-picture",
+              "instruction": "Choose the correct picture.",
+              "prompt": "Pick the sun",
+              "images": [
+                {
+                  "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0MCIgZmlsbD0iI2ZkZTA0NyIvPjwvc3ZnPg==",
+                  "caption": "sun",
+                  "correct": true
+                },
+                {
+                  "src": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzYwYTVmYSIvPjwvc3ZnPg==",
+                  "caption": "sky",
+                  "correct": false
+                }
+              ]
+            },
+            {
+              "id": "t4",
+              "type": "click-on-picture",
+              "title": "4. click-on-picture",
+              "instruction": "Click on the object in the picture.",
+              "image": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMTAwIj48cmVjdCBmaWxsPSIjNjM2NmYxIiB3aWR0aD0iMjAwIiBoZWlnaHQ9IjEwMCIvPjxjaXJjbGUgY3g9IjUwIiBjeT0iNTAiIHI9IjMwIiBmaWxsPSIjZmZmIi8+PC9zdmc+",
+              "hotspots": [
+                {
+                  "label": "circle",
+                  "x": 25.0,
+                  "y": 50.0,
+                  "r": 15.0
+                }
+              ]
+            },
+            {
+              "id": "t5",
+              "type": "crosswords",
+              "title": "5. crosswords",
+              "instruction": "Solve the crossword.",
+              "cells": [
+                {
+                  "x": 0,
+                  "y": 0
+                },
+                {
+                  "x": 1,
+                  "y": 0
+                },
+                {
+                  "x": 2,
+                  "y": 0
+                },
+                {
+                  "x": 0,
+                  "y": 1
+                },
+                {
+                  "x": 0,
+                  "y": 2
+                }
+              ],
+              "clues": [
+                {
+                  "word": "CAT",
+                  "dir": "across",
+                  "clue": "A pet that purrs"
+                },
+                {
+                  "word": "CAR",
+                  "dir": "down",
+                  "clue": "A vehicle with four wheels"
+                }
+              ]
+            },
+            {
+              "id": "t6",
+              "type": "definition-match",
+              "title": "6. definition-match",
+              "instruction": "Match the words with their definitions.",
+              "pairs": [
+                {
+                  "left": "orbit",
+                  "right": "the path a planet follows"
+                },
+                {
+                  "left": "gravity",
+                  "right": "the force that pulls things down"
+                }
+              ]
+            },
+            {
+              "id": "t7",
+              "type": "dictation",
+              "title": "7. dictation",
+              "instruction": "Listen to the audio and type exactly what you hear.",
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "https://upload.wikimedia.org/wikipedia/commons/3/3d/En-us-weather.ogg",
+                  "caption": "sample audio clip"
+                }
+              ],
+              "text": "The weather is nice today."
+            },
+            {
+              "id": "t8",
+              "type": "error-correction",
+              "title": "8. error-correction",
+              "instruction": "Find and click the wrong word, then fix it.",
+              "sentence": "She go to school every day.",
+              "wrongIndex": 1,
+              "fix": "goes"
+            },
+            {
+              "id": "t9",
+              "type": "find-and-click",
+              "title": "9. find-and-click",
+              "instruction": "Click the required words in the text.",
+              "text": "The cat sat on the mat.",
+              "targets": [
+                "cat",
+                "mat"
+              ],
+              "mode": "words"
+            },
+            {
+              "id": "t10",
+              "type": "gap-fill",
+              "title": "10. gap-fill",
+              "instruction": "Fill in the gap.",
+              "text": "I ___ a student.",
+              "blanks": [
+                {
+                  "answers": [
+                    "am"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "t11",
+              "type": "initials",
+              "title": "11. initials",
+              "instruction": "Name the words that start with this letter.",
+              "items": [
+                {
+                  "word": "apple",
+                  "initial": "a"
+                },
+                {
+                  "word": "banana",
+                  "initial": "b"
+                }
+              ]
+            },
+            {
+              "id": "t12",
+              "type": "listen-choice",
+              "title": "12. listen-choice",
+              "instruction": "Listen to the audio and choose the correct answer.",
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "https://upload.wikimedia.org/wikipedia/commons/3/3d/En-us-weather.ogg",
+                  "caption": "sample audio clip"
+                }
+              ],
+              "options": [
+                "one",
+                "two",
+                "three"
+              ],
+              "answerIndex": 2
+            },
+            {
+              "id": "t13",
+              "type": "listen-gap",
+              "title": "13. listen-gap",
+              "instruction": "Listen and fill in the missing word.",
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "https://upload.wikimedia.org/wikipedia/commons/3/3d/En-us-weather.ogg",
+                  "caption": "sample audio clip"
+                }
+              ],
+              "text": "He ___ me yesterday.",
+              "blanks": [
+                {
+                  "answers": [
+                    "called"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "t14",
+              "type": "matching",
+              "title": "14. matching",
+              "instruction": "Match the items.",
+              "pairs": [
+                {
+                  "left": "cat",
+                  "right": "кошка"
+                },
+                {
+                  "left": "dog",
+                  "right": "собака"
+                }
+              ]
+            },
+            {
+              "id": "t15",
+              "type": "memory-pairs",
+              "title": "15. memory-pairs",
+              "instruction": "Find matching pairs of cards.",
+              "pairs": [
+                {
+                  "front": "cat",
+                  "back": "кошка"
+                },
+                {
+                  "front": "dog",
+                  "back": "собака"
+                },
+                {
+                  "front": "bird",
+                  "back": "птица"
+                }
+              ]
+            },
+            {
+              "id": "t16",
+              "type": "multiple-choice",
+              "title": "16. multiple-choice",
+              "instruction": "Choose the correct answer.",
+              "options": [
+                "apple",
+                "banana",
+                "pear"
+              ],
+              "answerIndex": 1
+            },
+            {
+              "id": "t17",
+              "type": "multiple-select",
+              "title": "17. multiple-select",
+              "instruction": "Select all correct answers.",
+              "options": [
+                {
+                  "text": "cat",
+                  "correct": true
+                },
+                {
+                  "text": "dog",
+                  "correct": true
+                },
+                {
+                  "text": "car",
+                  "correct": false
+                }
+              ]
+            },
+            {
+              "id": "t18",
+              "type": "reading-truefalse",
+              "title": "18. reading-truefalse",
+              "instruction": "Read the text and decide if the statements are true or false.",
+              "passage": "Anna gets up at seven. She has coffee and reads the news.",
+              "statements": [
+                {
+                  "text": "Anna wakes at 7:00.",
+                  "answer": true
+                },
+                {
+                  "text": "Anna reads a book.",
+                  "answer": false
+                }
+              ]
+            },
+            {
+              "id": "t19",
+              "type": "reorder-text",
+              "title": "19. reorder-text",
+              "instruction": "Put the story lines in the correct order.",
+              "lines": [
+                "Once upon a time there was a king.",
+                "He lived in a big castle.",
+                "One day a dragon appeared."
+              ]
+            },
+            {
+              "id": "t20",
+              "type": "sentence-transform",
+              "title": "20. sentence-transform",
+              "instruction": "Transform the sentence as instructed.",
+              "source": "I like tea.",
+              "task": "Make it negative",
+              "answers": [
+                "I don't like tea."
+              ]
+            },
+            {
+              "id": "t21",
+              "type": "short-answer",
+              "title": "21. short-answer",
+              "instruction": "Answer the question in your own words.",
+              "question": "What is the capital of France?",
+              "answers": [
+                "Paris"
+              ],
+              "model": "The capital of France is Paris."
+            },
+            {
+              "id": "t22",
+              "type": "speaking-repeat",
+              "title": "22. speaking-repeat",
+              "instruction": "Read the phrase aloud (recording is optional).",
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "https://upload.wikimedia.org/wikipedia/commons/3/3d/En-us-weather.ogg",
+                  "caption": "sample audio clip"
+                }
+              ],
+              "modelText": "Could you repeat that, please?"
+            },
+            {
+              "id": "t23",
+              "type": "spelling",
+              "title": "23. spelling",
+              "instruction": "Type the word with correct spelling.",
+              "media": [
+                {
+                  "type": "audio",
+                  "src": "https://upload.wikimedia.org/wikipedia/commons/3/3d/En-us-weather.ogg",
+                  "caption": "sample audio clip"
+                }
+              ],
+              "word": "beautiful",
+              "prompt": "Listen and write the word correctly."
+            },
+            {
+              "id": "t24",
+              "type": "timeline",
+              "title": "24. timeline",
+              "instruction": "Arrange the events on the timeline.",
+              "events": [
+                {
+                  "label": "Birth",
+                  "date": "1900"
+                },
+                {
+                  "label": "Career start",
+                  "date": "1925"
+                },
+                {
+                  "label": "Death",
+                  "date": "1980"
+                }
+              ]
+            },
+            {
+              "id": "t25",
+              "type": "translate-match",
+              "title": "25. translate-match",
+              "instruction": "Match the words with their translations.",
+              "pairs": [
+                {
+                  "left": "hello",
+                  "right": "привет"
+                },
+                {
+                  "left": "bye",
+                  "right": "пока"
+                }
+              ]
+            },
+            {
+              "id": "t26",
+              "type": "true-false",
+              "title": "26. true-false",
+              "instruction": "The cat can fly.",
+              "explanation": "Cats cannot fly.",
+              "answer": false
+            },
+            {
+              "id": "t27",
+              "type": "video-quiz",
+              "title": "27. video-quiz",
+              "instruction": "Watch the video and answer the question.",
+              "media": [
+                {
+                  "type": "video",
+                  "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+                  "caption": "sample video clip"
+                }
+              ],
+              "questions": [
+                {
+                  "text": "What shape do you see?",
+                  "options": [
+                    "circle",
+                    "square"
+                  ],
+                  "answerIndex": 0
+                }
+              ]
+            },
+            {
+              "id": "t28",
+              "type": "video-sequence",
+              "title": "28. video-sequence",
+              "instruction": "Put the events of the video in the correct order.",
+              "media": [
+                {
+                  "type": "video",
+                  "src": "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+                  "caption": "sample video clip"
+                }
+              ],
+              "items": [
+                "The hero wakes up",
+                "The hero leaves home",
+                "The final battle"
+              ]
+            },
+            {
+              "id": "t29",
+              "type": "word-order",
+              "title": "29. word-order",
+              "instruction": "Put the words in the correct order.",
+              "words": [
+                "is",
+                "This",
+                "a",
+                "task"
+              ],
+              "answer": "This is a task"
+            },
+            {
+              "id": "t30",
+              "type": "word-search",
+              "title": "30. word-search",
+              "instruction": "Find the hidden words in the grid.",
+              "words": [
+                "CAT",
+                "DOG"
+              ],
+              "grid": [
+                "CTATO",
+                "AOHDO",
+                "GXXYF"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -2052,6 +2052,14 @@ def scan_textbooks() -> list[dict]:
             "icon": manifest.get("icon", ""),
             "author": manifest.get("author", ""),
             "source": manifest.get("source", ""),
+            # passport fields must be on the card too — otherwise a course
+            # that exists both as an installed folder AND as a flat hub pack
+            # is not recognised as the same packageId by the de-duplicator
+            # below and appears twice in the library (bug: TEST QWEN GEN
+            # showed up as two cards, the broken flat-pack one refused to
+            # open).
+            "packageId": manifest.get("packageId", ""),
+            "revision": manifest.get("revision", 1),
             "books": books,
         })
     # published teacher courses: shared-exercises/<course>/ has the very same
@@ -2220,9 +2228,47 @@ def _ensure_folder_for(base_dir: str, entry: str) -> Optional[str]:
     return None
 
 
+def _pack_card_folder(entry: str) -> Optional[str]:
+    """A flat shared pack (``shared-exercises/<name>.iebpack.json``) behaves
+    like a virtual course folder named ``<name>`` (the ``.iebpack.json``
+    suffix stripped).  If such a pack exists, materialise it into the
+    textbooks library exactly once (install_pack stamps the passport, so a
+    re-sync later recognises the folder and skips/updates instead of
+    duplicating) and return the resulting folder name.  This is what fixes
+    'TEST QWEN GEN does not open': hub packs used to appear in the library
+    as cards whose folder was only the raw .iebpack.json file, which no
+    loader could open."""
+    if not entry.endswith(PACK_EXT):
+        return None
+    base = entry[: -len(PACK_EXT)]
+    # an already-materialised course folder (or any folder sharing the id)
+    # wins — no need to import anything
+    if os.path.isdir(os.path.join(TEXTBOOKS_DIR, base)) and \
+            _find_manifest(os.path.join(TEXTBOOKS_DIR, base)):
+        return base
+    try:
+        with open(os.path.join(SHARED_DIR, entry), encoding="utf-8") as fh:
+            pk = json.load(fh)
+        res = import_pack(pk)
+        return res.get("folder") or base
+    except Exception:
+        return None
+
+
 def get_textbook_meta(folder_or_id: str) -> tuple[str, dict]:
     """Resolve a folder-name or textbook id -> (folder, manifest)."""
     os.makedirs(TEXTBOOKS_DIR, exist_ok=True)
+    # virtual folder backed by a flat hub pack -> materialise on first open.
+    # Only when the name is definitely NOT an existing course already; and we
+    # never fall back to slug-guessing (that could import an unrelated pack).
+    if folder_or_id.endswith(PACK_EXT) and not os.path.isdir(
+            os.path.join(TEXTBOOKS_DIR, folder_or_id[: -len(PACK_EXT)])):
+        virt = _pack_card_folder(folder_or_id)
+        if virt:
+            folder_or_id = virt
+            cand2 = os.path.join(TEXTBOOKS_DIR, folder_or_id)
+            if os.path.isdir(cand2) and _find_manifest(cand2):
+                return cand2, _read_manifest(_find_manifest(cand2))  # type: ignore
     # direct folder hit (also accepts an exact folder name, not just manifest id)
     cand = os.path.join(TEXTBOOKS_DIR, folder_or_id)
     if (os.path.isdir(cand) and _find_manifest(cand)) or folder_or_id.lower().endswith(ARCHIVE_EXTS):
