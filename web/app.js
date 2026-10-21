@@ -212,11 +212,16 @@ async function doSync(reconfigure) {
     if (res.updated.length) bits.push("↻ updated: " + res.updated.join(", "));
     if (res.merged.length)  bits.push("🤝 merged (changes of several teachers combined): " + res.merged.join(", "));
     if (res.skipped.length) bits.push("＝ already up to date: " + res.skipped.length + " course(s)");
-    if (res.note && !res.added.length && !res.updated.length && !res.merged.length && !res.skipped.length)
-      bits.push("(" + res.note + ")");
-    if (res.offline)        bits.push("(offline — showing last known list)");
+    /* nothing was actually changed this run — say exactly why instead of a
+       fake “all courses updated” success */
+    if (!res.added.length && !res.updated.length && !res.merged.length && !res.skipped.length) {
+      if (res.note) bits.push("(" + res.note + ")");
+      else if (!res.errors.length) bits.push("Nothing changed.");
+    }
+    if (res.offline)        bits.push("(offline — showing last known list, nothing was installed)");
     if (res.errors.length)  bits.push("⚠ " + res.errors.join("; "));
-    toast("🔄 Sync finished\n" + (bits.join("\n") || "Nothing changed."), res.errors.length ? "bad" : "ok");
+    const ok = !res.errors.length && (res.added.length + res.updated.length + res.merged.length > 0);
+    toast("🔄 Sync finished\n" + bits.join("\n"), res.errors.length ? "bad" : (ok ? "ok" : "warn"));
     invalidateCachesAndRefresh();
   } catch (e) {
     const msg = String(e && e.message || e);
