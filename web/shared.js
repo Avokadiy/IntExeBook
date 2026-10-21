@@ -611,7 +611,36 @@
    * fine-grained PAT.
    * ===================================================================== */
 
-  var SYNC_DEFAULTS = { owner: "Avokadiy", repo: "IntExeBook", branch: "audio-and-dark-theme-5c6ce", folder: "shared-exercises" };
+  /* The shared hub is a dedicated BRANCH of this repository — never a random
+     feature branch. Everything sync-related (list / pull / publish) uses the
+     same constant, so a course published from any working branch lands in the
+     hub and every teacher pulls from exactly that place. To move the hub to
+     another branch, change SHARED_HUB_BRANCH below and push once; old packs
+     can be copied over with `git cherry-pick`/`git mv`. */
+  var SHARED_HUB_BRANCH = "shared-hub";
+  var SYNC_DEFAULTS = { owner: "Avokadiy", repo: "IntExeBook", branch: SHARED_HUB_BRANCH, folder: "shared-exercises" };
+
+  var SYNC_BRANCH_RESOLVED = false;
+  /* One-time per session sanity check: if the configured hub branch no longer
+     exists in the remote repository (renamed/deleted), adopt the repository's
+     default branch instead of silently listing an empty folder. */
+  async function syncResolveHubBranch(cfg) {
+    if (SYNC_BRANCH_RESOLVED || !cfg || !cfg.token) return cfg;
+    try {
+      var headers = { Accept: "application/vnd.github+json", Authorization: "Bearer " + cfg.token };
+      var probe = await fetch(apiBase(cfg) + "/contents/" + encodeURIComponent(cfg.folder) + "?ref=" + encodeURIComponent(cfg.branch), { headers: headers });
+      SYNC_BRANCH_RESOLVED = true;
+      if (probe.status === 404) {
+        var meta = await ghFetch(apiBase(cfg), { headers: headers });
+        var def = (await meta.json()).default_branch;
+        if (def && def !== cfg.branch) {
+          cfg.branch = def;
+          var saved = syncConfig(); saved.branch = def; saveSyncConfig(saved);
+        }
+      }
+    } catch (e) { /* network issue — keep the configured branch */ }
+    return cfg;
+  }
 
   function syncStorage() {
     /* works in the browser (localStorage) and in Node tests (in-memory) */
@@ -939,7 +968,7 @@
   /* the heart of the one-button flow: pull everything, apply smart-import
      decisions per package, remember what came from sync */
   async function syncPull(onProgress) {
-    var cfg = syncConfig();
+    var cfg = await syncResolveHubBranch(syncConfig());
     var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false, note: "" };
     var listed;
     try {
