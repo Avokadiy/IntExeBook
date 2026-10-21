@@ -872,7 +872,7 @@
     return rec.contentHash !== contentDigest(packObj);
   }
 
-  function rememberPackContent(packObj) {
+  function rememberPackContent(packObj, extra) {
     if (!packObj || !packObj.packageId) return;
     var reg = syncRegistry();
     var rec = reg[packObj.packageId] || {};
@@ -881,7 +881,25 @@
     rec.revision = packObj.revision || rec.revision || 1;
     rec.fingerprint = packObj.fingerprint || rec.fingerprint || null;
     rec.name = (packObj.manifest && packObj.manifest.title) || rec.name || packObj.packageId;
+    if (extra) for (var k in extra) if (extra[k] != null) rec[k] = extra[k];
     syncRegistrySet(packObj.packageId, rec);
+  }
+
+  /* After a successful server-side install/update/merge we re-read the
+     installed passport from /api/installed-packs. If the backend did NOT
+     stamp the packageId into the course (older server build), we flag the
+     registry record "serverBlind": without this flag the next Update press
+     would not recognise the already-installed course and would install a
+     duplicate copy of it. With the flag we still skip by content digest —
+     zero duplicates even against an old backend. */
+  async function confirmServerPassport(packObj) {
+    try {
+      var packs = await listInstalledPacks();
+      for (var i = 0; i < packs.length; i++) {
+        if (packs[i] && packs[i].packageId === packObj.packageId) return true;
+      }
+    } catch (e) { /* unreachable */ }
+    return false;
   }
 
   /* install one downloaded pack through the local backend (server mode);
@@ -974,8 +992,13 @@
           result.skipped.push(p.name); continue;
         }
         var install = await installPack(pack, decision);
-        rememberPackContent(pack);
-        syncRegistrySet(pack.packageId, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name });
+        /* verify the backend really stamped our packageId into the course;
+           if not (old server build), remember that fact so the NEXT sync
+           still skips this pack by content digest instead of installing a
+           duplicate copy. */
+        var stamped = await confirmServerPassport(pack);
+        rememberPackContent(pack, { remotePath: p.path, revision: pack.revision || 1,
+          fingerprint: pack.fingerprint, name: p.name, serverBlind: !stamped });
         installed = await listInstalledPacks();   // keep the view fresh for later files
         var act = install.action || decision.action;
         if (act === "merge" || act === "fork") result.merged.push(install.title || p.name);
@@ -1028,6 +1051,7 @@
     pull: syncPull, pushPack: syncPushPack,
     registry: syncRegistry, registrySet: syncRegistrySet,
     contentDigest: contentDigest, packContentChanged: packContentChanged,
+    rememberContent: rememberPackContent,
     rememberPackContent: rememberPackContent,
     listInstalled: listInstalledPacks, installPack: installPack };
   }

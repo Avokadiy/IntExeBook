@@ -722,12 +722,35 @@
     }
     const rememberPublished = () => lsSetPublishMeta(session.draftName, { packageId: packObj.packageId, revision: packObj.revision, title: manifest.title });
 
+    /* ---- keep the LOCAL library in sync with what was just published.
+       Publishing straight to GitHub (destination 1) used to leave no local
+       copy at all — and every "🔄 Update" then re-downloaded the course as
+       if it were someone else's. Now we also install the pack into the
+       local backend (idempotent: same packageId -> update, never a copy),
+       and register its content digest so future syncs recognise it. */
+    const mirrorLocally = async () => {
+      try {
+        if (window.IEB_SYNC && window.IEB_SYNC.installPack) {
+          await window.IEB_SYNC.installPack(packObj, { action: packObj.revision > 1 ? "update" : "install" });
+        }
+      } catch (e) { /* offline / file:// mode — registry below still helps */ }
+      try {
+        if (window.IEB_SYNC && window.IEB_SYNC.rememberContent) {
+          window.IEB_SYNC.rememberContent(packObj, {
+            remotePath: "shared-exercises/" + packObj.packageId + ".iebpack.json",
+            name: packObj.packageId + ".iebpack.json"
+          });
+        }
+      } catch (e) { /* registry unavailable */ }
+    };
+
     /* ---- destination 1: GitHub hub (works even in file:// mode) ---- */
     const cfg = window.IEB_SYNC ? window.IEB_SYNC.config() : null;
     if (cfg && cfg.token && window.IEB_SYNC) {
       const doPush = async () => {
         try {
           const r = await window.IEB_SYNC.pushPack(packObj);
+          await mirrorLocally();
           invalidateCaches();
           if (session) { session.publishedTo = r.name; }
           rememberPublished();
@@ -766,6 +789,7 @@
         invalidateCaches();
         if (session) { session.publishedTo = res.folder; }
         rememberPublished();
+        try { if (window.IEB_SYNC && window.IEB_SYNC.rememberContent) window.IEB_SYNC.rememberContent(packObj); } catch (e) {}
         openModal(modal("📦 Published!", [
           h("p", null, ["Course ", h("strong", null, "“" + res.title + "”"), " is now in your library and saved as a shareable package:"]),
           h("div", { class: "ed-path" }, "shared-exercises/" + res.folder + "/"),

@@ -1158,6 +1158,19 @@ def create_textbook(payload: dict) -> dict:
     folder = unique_folder(slugify(manifest["id"] or manifest["title"]))
     manifest["id"] = os.path.basename(folder)
     assets = payload.get("assets") or {}
+    # stamp the passport fields (packageId/revision/fingerprint) BEFORE the
+    # first write — otherwise a course that was published straight to GitHub
+    # (no local copy) is invisible to find_installed_by_package() and every
+    # later sync installs it as a brand-new duplicate instead of updating.
+    for key in ("packageId", "revision", "fingerprint", "authorKey"):
+        if payload.get(key) is not None and key not in manifest:
+            manifest[key] = payload[key]
+    if manifest.get("packageId"):
+        try:
+            manifest.setdefault("revision", max(1, int(payload.get("revision") or 1)))
+        except (TypeError, ValueError):
+            manifest.setdefault("revision", 1)
+        manifest.setdefault("fingerprint", pack_fingerprint(manifest, books, assets))
     write_textbook(folder, manifest, books, assets)
     invalidate_cache()
     return {"folder": os.path.basename(folder), "id": manifest["id"], "title": manifest["title"]}
