@@ -1271,6 +1271,80 @@ window.IEB_APP = {
   findUnit, findLesson, mediaSrc, normalizeMediaSrc, mediaHtml,
 };
 
+/* ============================================================
+   EASTER EGG — the Konami code. ↑↑↓↓←→←→BA anywhere on the page
+   unlocks a hidden "founder" mode. Nothing in the UI hints at it;
+   only those who know will find it.
+   ============================================================ */
+(function () {
+  const SEQ = ["ArrowUp","ArrowUp","ArrowDown","ArrowDown","ArrowLeft","ArrowRight","ArrowLeft","ArrowRight","b","a"];
+  let pos = 0, unlocked = sessionStorage.getItem("ieb-egg") === "1";
+  document.addEventListener("keydown", (e) => {
+    if (e.target.matches("input, textarea, select")) return;
+    const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if (key === SEQ[pos]) { pos++; } else { pos = (key === SEQ[0]) ? 1 : 0; }
+    if (pos === SEQ.length) { pos = 0; activateEgg(); }
+  });
+
+  function activateEgg() {
+    if (unlocked) { toast("🥚 Already unlocked — press ✨ in the brand."); return; }
+    unlocked = true;
+    try { sessionStorage.setItem("ieb-egg", "1"); } catch (err) {}
+    toast("🕹️ Konami accepted. Hidden mode unlocked…");
+    const brand = document.getElementById("brandHome");
+    if (brand) {
+      brand.textContent = "✨ 📖 IntExeBook";
+      brand.title = "You found it.";
+      brand.addEventListener("click", founderMode);
+    }
+    const ver = document.getElementById("appVersion");
+    if (ver) ver.textContent = "v1.0 · akkaki edition";
+  }
+  if (unlocked && document.readyState !== "loading") {
+    const b = document.getElementById("brandHome");
+    if (b) { b.textContent = "✨ 📖 IntExeBook"; b.addEventListener("click", founderMode); }
+    const v = document.getElementById("appVersion");
+    if (v) v.textContent = "v1.0 · akkaki edition";
+  } else if (unlocked) {
+    document.addEventListener("DOMContentLoaded", activateEggSilently, { once: true });
+  }
+  function activateEggSilently() {
+    const b = document.getElementById("brandHome");
+    if (b) { b.textContent = "✨ 📖 IntExeBook"; b.title = "You found it."; b.addEventListener("click", founderMode); }
+    const v = document.getElementById("appVersion");
+    if (v) v.textContent = "v1.0 · akkaki edition";
+  }
+
+  function founderMode(e) {
+    e.preventDefault();
+    const host = document.body;
+    if (document.getElementById("akkaki-overlay")) { document.getElementById("akkaki-overlay").remove(); return; }
+    const ov = document.createElement("div");
+    ov.id = "akkaki-overlay";
+    ov.style.cssText = "position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(5,8,18,.72);backdrop-filter:blur(6px);cursor:pointer;animation:akFade .4s ease";
+    ov.innerHTML = `
+      <div style="text-align:center;color:#fff;font-family:inherit">
+        <div style="font-size:64px;letter-spacing:8px;filter:drop-shadow(0 0 24px #818cf8);animation:akSpin 3s linear infinite">✦</div>
+        <div style="margin-top:18px;font-size:28px;font-weight:700;background:linear-gradient(90deg,#818cf8,#c084fc,#f472b6,#818cf8);background-size:300% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:akFlow 2.5s linear infinite">Akkaki was here</div>
+        <div style="margin-top:10px;font-size:13px;opacity:.75">founder mode · click anywhere to close</div>
+      </div>`;
+    ov.addEventListener("click", () => ov.remove());
+    const st = document.createElement("style");
+    st.textContent = "@keyframes akSpin{to{transform:rotate(360deg)}}@keyframes akFlow{to{background-position:300% 0}}@keyframes akFade{from{opacity:0}}";
+    document.head.appendChild(st);
+    host.appendChild(ov);
+    // brief confetti of book emojis
+    for (let i = 0; i < 24; i++) {
+      const s = document.createElement("span");
+      s.textContent = ["📖","✨","🎧","🎬","⭐"][i % 5];
+      s.style.cssText = `position:fixed;left:${Math.random()*100}vw;top:-4vh;z-index:10000;font-size:${14+Math.random()*22}px;pointer-events:none;transition:transform ${2+Math.random()*2}s cubic-bezier(.2,.6,.3,1),opacity 3s`;
+      document.body.appendChild(s);
+      requestAnimationFrame(() => { s.style.transform = `translateY(110vh) rotate(${(Math.random()*720-360)|0}deg)`; s.style.opacity = "0"; });
+      setTimeout(() => s.remove(), 4500);
+    }
+  }
+})();
+
 /* go! */
 initSearch();
 route();

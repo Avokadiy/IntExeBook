@@ -618,3 +618,11 @@ select.ed-input { appearance: auto; }
 /* make sure editor modals never exceed the viewport */
 .ed-modal-box-wide textarea.ed-input { max-width: 100%; }
 .ed-modal .ed-tabs { position: sticky; top: 0; background: var(--card); z-index: 2; padding-top: 4px; }
+
+/* ---- app version badge (bottom-left, subtle) ---- */
+.app-version {
+  position: fixed; left: 10px; bottom: 8px; z-index: 50;
+  font-size: 11px; letter-spacing: .4px; opacity: .45;
+  color: var(--muted, #9aa4b2); user-select: none; pointer-events: auto;
+}
+.app-version:hover { opacity: .9; }
