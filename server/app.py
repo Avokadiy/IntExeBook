@@ -302,6 +302,27 @@ class Handler(BaseHTTPRequestHandler):
         if not secrets.compare_digest(str(key), str(self.ADMIN_KEY)):
             raise loader.TextbookError("admin key is missing or incorrect")
 
+    def _is_local_request(self) -> bool:
+        """True when the request came from this very machine.
+
+        The whole app runs on the teacher's own computer; the one-click
+        updater talks to it over loopback.  Requiring loopback lets us drop
+        the founder-key prompt for updates while keeping remote hosts out.
+        """
+        ip = str(self.client_address[0] if self.client_address else "")
+        return ip in ("127.0.0.1", "::1", "localhost") or ip.startswith("127.")
+
+    def _require_update_auth(self, qs: dict) -> None:
+        """Guard for POST /api/app-update* — no password for the teacher.
+
+        Allowed without any key only for loopback requests (the normal case:
+        the browser page served by this server).  Anything else still needs
+        the founder key, so a LAN-exposed server can't be updated remotely.
+        """
+        if self._is_local_request():
+            return
+        self._require_admin(qs)
+
     def log_message(self, fmt: str, *args) -> None:
         sys.stderr.write("[intexebook] %s\n" % (fmt % args))
 
@@ -404,20 +425,22 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"ok": True, "results": done})
 
             # ---- APP SELF-UPDATE -------------------------------------------------
-            # POST /api/app-update?key=<admin>  -> install a new app version.
+            # POST /api/app-update  -> install a new app version.
             # The browser (web/update.js) has already downloaded the release's
             # files from GitHub; here they are written into the app folder
-            # after strict path validation. Requires the founder key — this is
-            # the most privileged endpoint in the app.
+            # after strict path validation.  Teachers are NOT asked for any
+            # key: requests arriving over loopback (the app's own updater on
+            # this machine) are trusted; anything else still needs the founder
+            # key, so a LAN-exposed server cannot be updated remotely.
             if parts == ["api", "app-update"]:
-                self._require_admin(urllib.parse.parse_qs(parsed.query))
+                self._require_update_auth(urllib.parse.parse_qs(parsed.query))
                 res = loader.apply_app_update(body.get("files") or [])
                 return self._send_json(res)
 
-            # POST /api/app-update/rollback?key=<admin> -> undo a self-update
+            # POST /api/app-update/rollback -> undo a self-update
             # using the .app-backup/ copies taken right before overwriting.
             if parts == ["api", "app-update", "rollback"]:
-                self._require_admin(urllib.parse.parse_qs(parsed.query))
+                self._require_update_auth(urllib.parse.parse_qs(parsed.query))
                 return self._send_json(loader.rollback_app_update())
 
             # POST /api/drafts/<name>                 -> autosave an editor draft

@@ -1607,25 +1607,59 @@ APP_VERSION_FILE = os.path.join(ROOT, "app_version.json")
 
 
 def read_app_version() -> dict:
-    """The locally bundled app version (root app_version.json)."""
+    """The locally bundled app version (root app_version.json).
+
+    The self-updater writes the release's app_version.json into the app
+    folder too — but that file is also the *remote* manifest while editing
+    a release on the hub branch.  To keep the two apart, an installed copy
+    carries a private marker field "_installed": only files containing it
+    count as the local version.  A plain push of app_version.json to the
+    hub therefore never makes every synced teacher look like they already
+    installed that release (which used to silence the update dialog).
+    """
     try:
         with open(APP_VERSION_FILE, encoding="utf-8") as fh:
             j = json.load(fh)
-        return j if isinstance(j, dict) else {}
+        if isinstance(j, dict) and j.get("_installed"):
+            return j
     except Exception:
-        return {}
+        pass
+    return {"version": "1.3"}   # fallback for very old installs w/o marker
+
+
+INSTALLED_MARK = {"_installed"}  # appended by apply_app_update at install time
 
 
 def _safe_update_target(rel: str) -> str:
-    """Resolve a hub-relative file path inside ROOT, refusing escapes."""
+    """Resolve a hub-relative file path inside ROOT, refusing escapes.
+
+    The self-updater runs on the teacher's own machine and may only touch
+    the app's own code — never the user's data (textbooks/, shared-exercises/),
+    never git metadata, never dotfiles like .gitignore/.env.  Anything that
+    falls outside that whitelist is rejected with an explicit error.
+    """
     rel = str(rel or "").strip().lstrip("/")
-    if not rel or rel.startswith(".") or "\x00" in rel:
+    if not rel or "\x00" in rel:
         raise TextbookError("bad update file name")
-    target = os.path.realpath(os.path.join(ROOT, rel))
+    parts = [p for p in rel.split("/") if p]
+    if not parts or any(p == ".." for p in parts):
+        raise TextbookError("update file escapes the app folder: " + rel)
+    top = parts[0]
+    if top.startswith(".") or top in USER_DATA_DIRS or top in PROTECTED_NAMES:
+        raise TextbookError("updates must not touch %s: "
+                            "your courses and settings are protected" % top)
+    target = os.path.realpath(os.path.join(ROOT, "/".join(parts)))
     root_real = os.path.realpath(ROOT) + os.sep
     if not (target + os.sep).startswith(root_real) and target != os.path.realpath(ROOT):
         raise TextbookError("update file escapes the app folder: " + rel)
     return target
+
+
+# Folders that hold the teacher's / students' own content — the updater is
+# forbidden to write there even when a release manifest lists such a path.
+USER_DATA_DIRS = ("textbooks", "shared-exercises", "shared-textbooks",
+                  "drafts", ".app-backup")
+PROTECTED_NAMES = ("server.log", "README.md")
 
 
 def apply_app_update(files: list) -> dict:
@@ -1655,6 +1689,17 @@ def apply_app_update(files: list) -> dict:
         if os.path.islink(target):
             raise TextbookError("refusing to write through a symlink: " + rel)
         data = base64.b64decode(content) if b64 else content.encode("utf-8")
+        if rel.replace(os.sep, "/") == "app_version.json" and not b64:
+            # Mark the installed copy as local (see read_app_version): the
+            # same file on the hub branch is the *remote* release manifest.
+            try:
+                _m = json.loads(data.decode("utf-8"))
+                if isinstance(_m, dict):
+                    _m["_installed"] = True
+                    data = (json.dumps(_m, ensure_ascii=False, indent=2) +
+                            "\n").encode("utf-8")
+            except Exception:
+                pass
         os.makedirs(os.path.dirname(target), exist_ok=True)
         if os.path.isfile(target):
             # keep one pristine copy of every file we are about to replace
@@ -1853,6 +1898,11 @@ def save_hub_pack(fname: str, pack: dict) -> dict:
            "fingerprint": pack_fingerprint(manifest, books, assets),
            "manifest": manifest, "books": books, "assets": assets}
     base = os.path.basename(str(fname or ""))
+    # The hub branch is also where app releases live (app_version.json in the
+    # repo root).  Editing a course on the hub must never overwrite that file,
+    # so refuse any name that would land on it — before touching the disk.
+    if base == os.path.basename(APP_VERSION_FILE):
+        raise TextbookError("refusing to save a course over the release manifest")
     path = _safe_join(SHARED_DIR, base)
     if not os.path.isfile(path):
         raise TextbookError("hub pack not found: " + base)

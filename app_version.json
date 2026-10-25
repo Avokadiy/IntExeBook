@@ -1,22 +1,35 @@
 {
-  "version": "1.3.0",
+  "version": "1.4.0",
   "date": "2026-10-25",
-  "changelog": [
-    "Renamed the app-version check button to '🆕 App v1.3' — it was easy to confuse with the course-sync '🔄 Update' button; the tooltips now explain which is which.",
-    "The version badge at the bottom-left now shows the installed release (v1.3) and stays in sync with the app code.",
-    "One-click self-update: the update dialog now has an '⚡ Update now' button that downloads the new app files from GitHub and installs them straight into your folder — no manual ZIP handling anymore (courses and settings are untouched; a backup of replaced files is kept).",
-    "The header version badge and the update checker now read the installed version live from disk, so after an update the app immediately reports the new one.",
-    "Hub-installed courses are properly marked as shared, so the admin panel can also remove them from the computer.",
-    "App update checker: a dialog now appears when a new version is released, with the full changelog and a download button.",
-    "Fixed the header '⬆ Updates' button — it was rendered as a cramped circle; now it is a proper pill-shaped text button.",
-    "Deleting a course in the admin panel now also removes it from the shared-hub git branch.",
-    "Sync no longer reports courses as updated when shared-exercises is empty or installation fails.",
-    "30 exercise types: audio, video, text, speaking and more (see TEST QWEN GEN demo course).",
-    "Initial public release of IntExeBook.",
-    "Shared hub sync via GitHub branch shared-hub.",
-    "Admin panel (Konami code) to publish/edit/delete courses in the hub.",
-    "Dark theme, search, offline file:// mode."
-  ],
+  "changelogVersions": {
+    "1.4.0": [
+      "One-click update no longer asks for a founder key — just a simple \"Install v1.4 now?\" Yes/No window (the server only accepts update requests coming from this computer).",
+      "Changelog is now grouped by version: the update dialog shows only what's new in the release being installed, with older releases under \"Full changelog\".",
+      "Fixed the update check silently reporting \"you are on the latest version\": the hub's release manifest is no longer mistaken for the locally installed version.",
+      "Renamed the header button to \"🆕 New version?\" so it can't be confused with the course-sync \"🔄 Update\" button."
+    ],
+    "1.3.0": [
+      "Renamed the app-version check button to \"🆕 App v1.3\" — it was easy to confuse with the course-sync \"🔄 Update\" button; the tooltips now explain which is which.",
+      "The version badge at the bottom-left now shows the installed release (v1.3) and stays in sync with the app code."
+    ],
+    "1.2.0": [
+      "One-click self-update: the update dialog has an \"⚡ Update now\" button that downloads the new app files from GitHub and installs them straight into your folder — no manual ZIP handling anymore (a backup of replaced files is kept).",
+      "The header version badge and the update checker read the installed version live from disk.",
+      "Hub-installed courses are properly marked as shared, so the admin panel can also remove them from the computer."
+    ],
+    "1.1.0": [
+      "App update checker: a dialog appears when a new version is released, with the changelog and a download button.",
+      "Fixed the header \"⬆ Updates\" button shape.",
+      "Deleting a course in the admin panel now also removes it from the shared-hub git branch."
+    ],
+    "1.0.0": [
+      "Initial public release of IntExeBook.",
+      "Shared hub sync via GitHub branch shared-hub.",
+      "Admin panel (Konami code) to publish/edit/delete courses in the hub.",
+      "30 exercise types: audio, video, text, speaking and more (see TEST QWEN GEN demo course).",
+      "Dark theme, search, offline file:// mode."
+    ]
+  },
   "download": {
     "zip": "https://github.com/Avokadiy/IntExeBook/archive/refs/heads/shared-hub.zip"
   }

@@ -77,6 +77,42 @@
     return 0;
   }
 
+  /* Changelog by version.  A release manifest may carry either a flat list
+     ("changelog": ["a", "b"]) or an object keyed by version
+     ("changelogVersions": { "1.4.0": ["..."], "1.3.0": ["..."] }).  The
+     dialog always shows ONLY the changes of the release being offered —
+     older versions are listed under a collapsible "full changelog". */
+  function normalizeChangelog(m) {
+    var byVer = m.changelogVersions || m.changelogByVersion || null;
+    if (byVer && typeof byVer === "object" && !Array.isArray(byVer)) {
+      var vers = Object.keys(byVer).sort(cmpVer).reverse();   /* newest first */
+      return {
+        current: [].concat(byVer[m.version] || []),
+        history: vers.filter(function (v) { return v !== m.version; })
+                     .map(function (v) { return { version: v, items: [].concat(byVer[v] || []) }; })
+      };
+    }
+    var flat = Array.isArray(m.changelog) ? m.changelog :
+      (m.changelog ? [String(m.changelog)] : []);
+    return { current: flat.slice(), history: [] };
+  }
+
+  function renderChangelogHtml(cl) {
+    var li = cl.current.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("");
+    var out = "<b>What's new in v" + esc(cl._ver || "") + "</b><ul style=\"margin:8px 0 0 0\">" +
+      (li || "<li>No changelog provided.</li>") + "</ul>";
+    if (cl.history.length) {
+      out += "<details style=\"margin-top:10px\"><summary style=\"cursor:pointer;opacity:.75\">" +
+        "Full changelog (older versions)</summary>";
+      cl.history.forEach(function (h) {
+        out += "<div style=\"margin-top:8px\"><b>v" + esc(h.version) + "</b><ul style=\"margin:4px 0 0 0\">" +
+          h.items.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") + "</ul></div>";
+      });
+      out += "</details>";
+    }
+    return out;
+  }
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (m) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m];
@@ -99,21 +135,33 @@
   /* ------------------------------------------------------- local version */
   var LOCAL_VERSION = null;                  /* cached from the server */
 
+  function normalizeVer(v) {
+    /* "1.3" / "1.3.0" / "v1.3" -> comparable string; cmpVer pads parts */
+    return String(v || "").replace(/^v/i, "").trim();
+  }
+
   async function localVersion() {
     if (LOCAL_VERSION) return LOCAL_VERSION;
-    /* When served by the bundled python server, ask it — it reads the file
-       from disk, so right after a self-update (before any restart) it will
-       already report the NEW version. file:// falls back to the global. */
+    /* When served by the bundled python server, ask it — it reads the
+       installed copy of app_version.json from disk (marked "_installed" by
+       the self-updater), so right after a self-update it already reports
+       the NEW version.  The hub's own app_version.json is the *remote*
+       release manifest and must never count as the local version — that
+       used to silence the update dialog for everyone who pushed a release.
+       file:// falls back to the global baked into index.html. */
     try {
       if (location.protocol === "http:" || location.protocol === "https:") {
         var r = await fetch("/api/app-version?_=" + Date.now(), { cache: "reload" });
         if (r.ok) {
           var j = await r.json();
-          if (j && j.version) { LOCAL_VERSION = j.version; return j.version; }
+          if (j && j.version) {
+            LOCAL_VERSION = normalizeVer(j.version);
+            return LOCAL_VERSION;
+          }
         }
       }
     } catch (e) { /* ignore */ }
-    return window.IEB_APP_VERSION || "1.0.0";
+    return normalizeVer(window.IEB_APP_VERSION || "1.0.0");
   }
 
   /* --------------------------------------------------------- self-update */
@@ -132,8 +180,12 @@
   }
 
   /* Download every app file of the new release and hand them to the local
-     server, which validates paths and writes them into the app folder. */
-  async function performSelfUpdate(m, setStatus) {
+     server, which validates paths and writes them into the app folder.
+     `confirmed` must be true — the caller shows a yes/no dialog first; no
+     founder key is asked from the teacher anymore (the updater authenticates
+     itself against the localhost-only endpoint). */
+  async function performSelfUpdate(m, setStatus, confirmed) {
+    if (!confirmed) throw new Error("update was not confirmed");
     var c = cfg();
     var list = Array.isArray(m.files) && m.files.length ? m.files : DEFAULT_APP_FILES;
     /* never let a broken manifest wipe the updater itself */
@@ -141,13 +193,17 @@
       return p && !/^\.\./.test(p) && p.indexOf("\x00") < 0 &&
         p !== ".gitignore" && p.indexOf(".git/") !== 0;
     });
+    if (list.indexOf("app_version.json") < 0) list.unshift("app_version.json");
     var files = [];
     for (var i = 0; i < list.length; i++) {
       setStatus("Downloading " + list[i] + " (" + (i + 1) + "/" + list.length + ")…");
       files.push({ path: list[i], content: await fetchHubFile(c, m._sha, list[i]) });
     }
+    /* loopback installs are authenticated by the server itself (see
+       _require_update_auth); a stored founder key is only needed for
+       non-local servers, so keep it out of the URL in the normal case. */
     var key = "";
-    try { key = localStorage.getItem(LS_KEY) || ""; } catch (e) {}
+    try { if (!hasServer()) key = localStorage.getItem(LS_KEY) || ""; } catch (e) {}
     setStatus("Installing " + files.length + " files…");
     var res = await fetch("/api/app-update?key=" + encodeURIComponent(key), {
       method: "POST",
@@ -176,8 +232,8 @@
       "https://github.com/" + cfg().owner + "/" + cfg().repo +
       "/archive/refs/heads/" + cfg().branch + ".zip";
 
-    var items = (Array.isArray(m.changelog) ? m.changelog : (m.changelog ? [String(m.changelog)] : []))
-      .map(function (line) { return "<li>" + esc(line) + "</li>"; }).join("");
+    var cl = normalizeChangelog(m);
+    cl._ver = m.version;
 
     var mask = document.createElement("div");
     mask.id = "ieb-update-modal";
@@ -190,9 +246,8 @@
       '<div style="opacity:.75;margin-bottom:14px">IntExeBook <b>v' + esc(m.version) + '</b>' +
       (m.date ? ' · ' + esc(m.date) : '') +
       ' <span style="opacity:.6">(you have v' + esc(localV || "?") + ')</span></div>' +
-      '<div style="max-height:240px;overflow:auto;border-left:3px solid var(--accent,#4a6cf7);' +
-      'padding:2px 14px;margin-bottom:14px"><b>What\'s new</b><ul style="margin:8px 0 0 0">' +
-      (items || '<li>No changelog provided.</li>') + '</ul></div>' +
+      '<div style="max-height:280px;overflow:auto;border-left:3px solid var(--accent,#4a6cf7);' +
+      'padding:2px 14px;margin-bottom:14px">' + renderChangelogHtml(cl) + '</div>' +
       '<div id="iebUpStatus" style="min-height:18px;font-size:13px;margin-bottom:10px;opacity:.85"></div>' +
       '<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">' +
       '<button id="iebUpLater" class="btn" type="button" style="padding:8px 14px">Remind me later</button>' +
@@ -220,14 +275,26 @@
           "Use the ZIP button instead.");
         return;
       }
+      /* simple yes/no confirmation — no founder key, no password */
+      if (!window.confirm(
+          "Install IntExeBook v" + m.version + " now?\n\n" +
+          "The app will download the new files and restart itself.\n" +
+          "Your courses and settings are not touched, and the previous\n" +
+          "version is kept as a backup you can roll back to.")) {
+        setStatus("Update cancelled — nothing was changed.");
+        return;
+      }
       nowBtn.disabled = true;
+      later.disabled = true;
       try {
-        var out = await performSelfUpdate(m, setStatus);
+        var out = await performSelfUpdate(m, setStatus, true);
         setStatus("✅ Updated " + (out.written || []).length + " files. Reloading…");
         setTimeout(function () { location.reload(); }, 900);
       } catch (e) {
         nowBtn.disabled = false;
+        later.disabled = false;
         if (e && e.adminKeyMissing) {
+          /* only reachable for non-loopback servers; keep the old escape hatch */
           var k = prompt("Founder / admin key required to install updates\n(IEB_ADMIN_KEY, default \"akkaki\"):");
           if (k) {
             try { localStorage.setItem(LS_KEY, k); } catch (err) {}
@@ -259,6 +326,7 @@
     try { localStorage.setItem(LS_AT, String(Date.now())); } catch (e) {}
     if (cmpVer(m.version, local) > 0) {
       LOCAL_VERSION = local;               /* keep pre-update value in dialog */
+      try { localStorage.removeItem(LS_SEEN); } catch (e) {}  /* fresh release: re-ask */
       showDialog(m, local);
       return m;
     }
@@ -288,13 +356,13 @@
     b.className = "theme-toggle btn-text";
     b.type = "button";
     b.title = "Check for a new app release (not course sync — that is the 🔄 Update button)";
-    b.textContent = "🆕 App v1.3";
+    b.textContent = "🆕 New version?";
     b.addEventListener("click", function () {
-      b.disabled = true; b.textContent = "⏳ …";
+      b.disabled = true; b.textContent = "⏳ Checking…";
       check(true).catch(function () {}).then(function () {
-        b.disabled = false; b.textContent = "🆕 App v1.3";
+        b.disabled = false; b.textContent = "🆕 New version?";
       });
-      setTimeout(function () { b.disabled = false; b.textContent = "🆕 App v1.3"; }, 8000);
+      setTimeout(function () { b.disabled = false; b.textContent = "🆕 New version?"; }, 8000);
     });
     theme.parentNode.insertBefore(b, theme);
   }
