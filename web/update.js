@@ -29,6 +29,10 @@
   }
 
   function manifestUrl(c) {
+    /* NOTE: raw.githubusercontent.com caches per-URL and ignores unknown query
+       params like ?nocache — a plain fetch can keep serving a stale manifest
+       for minutes after a push. cache:"reload" (used in fetchManifest) forces
+       the browser to revalidate against origin. */
     return "https://raw.githubusercontent.com/" + c.owner + "/" + c.repo +
       "/" + c.branch + "/app_version.json?nocache=" + Date.now();
   }
@@ -50,7 +54,10 @@
 
   async function fetchManifest() {
     var c = cfg();
-    var res = await fetch(manifestUrl(c), { cache: "no-store" });
+    /* cache:"reload" — raw.githubusercontent.com may serve a stale copy of the
+       manifest for up to ~5 min after a push (?nocache is ignored there), so
+       always revalidate against origin when checking for app updates. */
+    var res = await fetch(manifestUrl(c), { cache: "reload" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     var j = await res.json();
     if (!j || !j.version) throw new Error("bad manifest");
