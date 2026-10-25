@@ -15,11 +15,13 @@ function makeEnv(opts) {
   };
   const el = () => ({ style: {}, querySelector: () => el(), appendChild(){},
                      addEventListener(){}, remove(){}, classList:{add(){},remove(){}},
-                     setAttribute(){}, textContent: "", innerHTML: "", disabled: false });
+                     setAttribute(){}, textContent: "", innerHTML: "", disabled: false,
+                     querySelectorAll: () => [], parentNode: null });
   const document = {
     readyState: "complete", getElementById: () => null, createElement: el,
     body: { appendChild(){}, querySelector: () => el() },
-    addEventListener(){}, querySelector: () => el()
+    addEventListener(){}, querySelector: () => el(),
+    querySelectorAll: () => []
   };
   return { ls, document, store };
 }

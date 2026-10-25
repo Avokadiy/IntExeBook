@@ -105,12 +105,18 @@
   var REMOTE_CHANGELOG = null;             /* last fetched changelogVersions */
 
   function mergeChangelogSources(m) {
-    var srcs = [m.changelogVersions, m.changelogByVersion];
+    var srcs = [m && m.changelogVersions, m && m.changelogByVersion];
+    /* newest snapshot first — when several sources carry the same version we
+       keep the most recent wording instead of mixing old and new bullets */
     try {
       var s = localStorage.getItem("ieb-last-release-manifest");
       if (s) { var p = JSON.parse(s); srcs.push(p.changelogVersions, p.changelogByVersion); }
     } catch (e) {}
     if (REMOTE_CHANGELOG) srcs.push(REMOTE_CHANGELOG);
+    try {
+      var l = localStorage.getItem("ieb-local-app-version");   /* served by /api/app-version */
+      if (l) { var q = JSON.parse(l); srcs.push(q.changelogVersions, q.changelogByVersion); }
+    } catch (e) {}
     var merged = {};
     srcs.forEach(function (byVer) {
       if (!byVer || typeof byVer !== "object" || Array.isArray(byVer)) return;
@@ -190,6 +196,8 @@
           var j = await r.json();
           if (j && j.version) {
             LOCAL_VERSION = normalizeVer(j.version);
+            /* keep the locally served notes as a changelog source too */
+            try { localStorage.setItem("ieb-local-app-version", JSON.stringify(j)); } catch (e) {}
             return LOCAL_VERSION;
           }
         }
@@ -267,6 +275,21 @@
       "/archive/refs/heads/" + cfg().branch + ".zip";
 
     var cl = normalizeChangelog(m);
+    /* The dialog must never render an empty changelog.  If the manifest we
+       are about to show carries no per-version notes (e.g. a stale raw CDN
+       copy), fall back to the freshest snapshot we have seen — the cached
+       hub release manifest or the locally served app_version.json. */
+    if (!cl.current.length && !cl.history.length) {
+      var altSrcs = [];
+      try { altSrcs.push(JSON.parse(localStorage.getItem("ieb-last-release-manifest") || "null")); } catch (e) {}
+      try { altSrcs.push(JSON.parse(localStorage.getItem("ieb-local-app-version") || "null")); } catch (e) {}
+      for (var ai = 0; ai < altSrcs.length; ai++) {
+        var alt = altSrcs[ai];
+        if (!alt || !alt.version) continue;
+        var cla = normalizeChangelog(alt);
+        if (cla.current.length || cla.history.length) { cl = cla; break; }
+      }
+    }
     cl._ver = m.version;
 
     var mask = document.createElement("div");
@@ -359,12 +382,39 @@
   /* --------------------------------------------------------- UI hooks */
   /* The manual update-check button stays hidden while the app is up to date.
      It only appears when a newer release is available in the hub (and after
-     an install it disappears again once the versions match). */
+     an install it disappears again once the versions match).
+
+     Legacy cleanup: older releases shipped a permanent "🆕 App vX" /
+     "⬆ Updates" button baked into web/index.html.  Remove any such leftover
+     on load — the version check now lives exclusively behind this dynamic
+     button, which is created only when a new release actually exists. */
+  function removeLegacyUpdateButtons() {
+    var legacy = document.querySelectorAll(
+      "#appHeader [data-update], #header [data-update], .update-btn, #checkUpdates");
+    for (var i = 0; i < legacy.length; i++) legacy[i].remove();
+    /* also drop the old static button by text signature, id may differ */
+    var hdr = document.getElementById("appHeader") || document.querySelector("header");
+    if (hdr) {
+      var btns = hdr.querySelectorAll("button");
+      for (var k = 0; k < btns.length; k++) {
+        var t = (btns[k].textContent || "").trim();
+        if (/^(⬆\s*Updates?|🆕\s*App(\s+v[\d.]+)?|🔄?\s*Check updates?)$/i.test(t)) {
+          btns[k].remove();
+        }
+      }
+    }
+  }
+
   function setUpdateBtnVisible(show) {
     var theme = document.getElementById("themeToggle");
     if (!theme) return;
+    if (!show) {
+      var old = document.getElementById("updateBtn");
+      if (old) old.remove();
+      return;
+    }
     var b = document.getElementById("updateBtn");
-    if (show && !b) {
+    if (!b) {
       b = document.createElement("button");
       b.id = "updateBtn";
       b.className = "theme-toggle btn-text";
@@ -384,8 +434,6 @@
         }, 8000);
       });
       theme.parentNode.insertBefore(b, theme);
-    } else if (!show && b) {
-      b.remove();
     }
   }
 
@@ -427,6 +475,8 @@
   }
 
   function boot() {
+    removeLegacyUpdateButtons();           /* never leave an old static button */
+    setUpdateBtnVisible(false);            /* hidden until a newer release exists */
     /* first check shortly after start, then periodically while open */
     setTimeout(function () { check(false); }, 2500);
     setInterval(function () { refresh(); }, POLL_MS);

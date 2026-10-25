@@ -1,7 +1,11 @@
 {
-  "version": "1.6.0",
+  "version": "1.7.0",
   "date": "2026-10-25",
   "changelogVersions": {
+    "1.7.0": [
+      "Fixed the empty changelog in the update dialog: release notes are now merged from every source (hub manifest, cached snapshot, local server) and a stale/empty manifest can never blank the dialog anymore.",
+      "The app-update button is now truly hidden while you are on the latest version — it appears only when a newer release exists in the hub, and any leftover static button from older builds is removed automatically on load."
+    ],
     "1.6.0": [
       "The \"🆕 New version?\" button is now hidden while the app is up to date — it only appears in the header when a newer release exists in the hub, and disappears again right after installing.",
       "Version badge at the bottom-left updated to v1.6."
