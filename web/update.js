@@ -153,7 +153,7 @@
     if (!theme || document.getElementById("updateBtn")) return;
     var b = document.createElement("button");
     b.id = "updateBtn";
-    b.className = "theme-toggle";
+    b.className = "theme-toggle btn-text";
     b.type = "button";
     b.title = "Check for a new version of the app";
     b.textContent = "⬆ Updates";

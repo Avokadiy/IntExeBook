@@ -375,6 +375,15 @@ body {
   transition: background .15s, transform .15s;
 }
 .theme-toggle:hover { background: var(--chip-bg-hover); transform: rotate(-15deg) scale(1.05); }
+/* text buttons in the header (e.g. ⬆ Updates) — pill shape, no icon spin */
+.theme-toggle.btn-text {
+  width: auto; height: auto;
+  padding: 9px 14px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+.theme-toggle.btn-text:hover { transform: none; }
+.theme-toggle[disabled] { opacity: .45; cursor: default; }
 
 /* the sync button reuses the round toggle look but carries a text label,
    so it must be a pill instead of a fixed 40px circle — otherwise the

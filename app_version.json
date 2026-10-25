@@ -1,9 +1,13 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "date": "2026-10-25",
   "changelog": [
+    "App update checker: a dialog now appears when a new version is released, with the full changelog and a download button.",
+    "Fixed the header '⬆ Updates' button — it was rendered as a cramped circle; now it is a proper pill-shaped text button.",
+    "Deleting a course in the admin panel now also removes it from the shared-hub git branch.",
+    "Sync no longer reports courses as updated when shared-exercises is empty or installation fails.",
+    "30 exercise types: audio, video, text, speaking and more (see TEST QWEN GEN demo course).",
     "Initial public release of IntExeBook.",
-    "30 exercise types: audio, video, text, speaking and more.",
     "Shared hub sync via GitHub branch shared-hub.",
     "Admin panel (Konami code) to publish/edit/delete courses in the hub.",
     "Dark theme, search, offline file:// mode."
