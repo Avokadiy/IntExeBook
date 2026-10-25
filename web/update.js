@@ -343,6 +343,62 @@
     /* click outside does NOT dismiss — an update dialog should be explicit */
   }
 
+  function toastUpToDate(m) {
+    var el = document.getElementById("edToast");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "edToast"; el.className = "ed-toast";
+      document.body.appendChild(el);
+    }
+    el.textContent = "✅ You are on the latest version (v" + m.version + ")";
+    el.className = "ed-toast show ok";
+    clearTimeout(el._h);
+    el._h = setTimeout(function () { el.className = "ed-toast"; }, 5000);
+  }
+
+  /* --------------------------------------------------------- UI hooks */
+  /* The manual update-check button stays hidden while the app is up to date.
+     It only appears when a newer release is available in the hub (and after
+     an install it disappears again once the versions match). */
+  function setUpdateBtnVisible(show) {
+    var theme = document.getElementById("themeToggle");
+    if (!theme) return;
+    var b = document.getElementById("updateBtn");
+    if (show && !b) {
+      b = document.createElement("button");
+      b.id = "updateBtn";
+      b.className = "theme-toggle btn-text";
+      b.type = "button";
+      b.title = "A new app version is available — click to see the changelog and install it (course sync is the 🔄 Update button)";
+      b.textContent = "🆕 New version!";
+      b.addEventListener("click", function () {
+        b.disabled = true; b.textContent = "⏳ Checking…";
+        Promise.resolve(check(true)).catch(function () {})
+          .then(function (m) {
+            b.disabled = false;
+            b.textContent = m ? "🆕 New version!" : "✅ Up to date";
+            if (!m) setTimeout(function () { setUpdateBtnVisible(false); }, 3000);
+          });
+        setTimeout(function () {
+          if (b.disabled) { b.disabled = false; b.textContent = "🆕 New version!"; }
+        }, 8000);
+      });
+      theme.parentNode.insertBefore(b, theme);
+    } else if (!show && b) {
+      b.remove();
+    }
+  }
+
+  async function refresh() {
+    var local = await localVersion();
+    var m = null;
+    try { m = await fetchManifest(); } catch (e) { /* offline — keep current state */ }
+    if (!m) return null;
+    var newer = cmpVer(m.version, local) > 0;
+    setUpdateBtnVisible(newer);
+    return newer ? m : null;
+  }
+
   async function check(force) {
     var local = await localVersion();
     if (!force) {
@@ -361,51 +417,19 @@
     if (cmpVer(m.version, local) > 0) {
       LOCAL_VERSION = local;               /* keep pre-update value in dialog */
       try { localStorage.removeItem(LS_SEEN); } catch (e) {}  /* fresh release: re-ask */
+      setUpdateBtnVisible(true);           /* show the button only with a new release */
       showDialog(m, local);
       return m;
     }
+    setUpdateBtnVisible(false);            /* up to date — hide the button */
     if (force) toastUpToDate(m);
     return null;
   }
 
-  function toastUpToDate(m) {
-    var el = document.getElementById("edToast");
-    if (!el) {
-      el = document.createElement("div");
-      el.id = "edToast"; el.className = "ed-toast";
-      document.body.appendChild(el);
-    }
-    el.textContent = "✅ You are on the latest version (v" + m.version + ")";
-    el.className = "ed-toast show ok";
-    clearTimeout(el._h);
-    el._h = setTimeout(function () { el.className = "ed-toast"; }, 5000);
-  }
-
-  /* --------------------------------------------------------- UI hooks */
-  function addMenuButton() {
-    var theme = document.getElementById("themeToggle");
-    if (!theme || document.getElementById("updateBtn")) return;
-    var b = document.createElement("button");
-    b.id = "updateBtn";
-    b.className = "theme-toggle btn-text";
-    b.type = "button";
-    b.title = "Check for a new app release (not course sync — that is the 🔄 Update button)";
-    b.textContent = "🆕 New version?";
-    b.addEventListener("click", function () {
-      b.disabled = true; b.textContent = "⏳ Checking…";
-      check(true).catch(function () {}).then(function () {
-        b.disabled = false; b.textContent = "🆕 New version?";
-      });
-      setTimeout(function () { b.disabled = false; b.textContent = "🆕 New version?"; }, 8000);
-    });
-    theme.parentNode.insertBefore(b, theme);
-  }
-
   function boot() {
-    addMenuButton();
     /* first check shortly after start, then periodically while open */
     setTimeout(function () { check(false); }, 2500);
-    setInterval(function () { check(false); }, POLL_MS);
+    setInterval(function () { refresh(); }, POLL_MS);
   }
 
   if (typeof window !== "undefined") {

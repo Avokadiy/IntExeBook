@@ -1,7 +1,11 @@
 {
-  "version": "1.5.0",
+  "version": "1.6.0",
   "date": "2026-10-25",
   "changelogVersions": {
+    "1.6.0": [
+      "The \"🆕 New version?\" button is now hidden while the app is up to date — it only appears in the header when a newer release exists in the hub, and disappears again right after installing.",
+      "Version badge at the bottom-left updated to v1.6."
+    ],
     "1.5.0": [
       "One-click update no longer asks for a founder key — just a simple \"Install v1.4 now?\" Yes/No window (the server only accepts update requests coming from this computer).",
       "Changelog is now grouped by version: the update dialog shows only what's new in the release being installed, with older releases under \"Full changelog\".",
