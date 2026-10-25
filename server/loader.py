@@ -1622,9 +1622,32 @@ def read_app_version() -> dict:
             j = json.load(fh)
         if isinstance(j, dict) and j.get("_installed"):
             return j
+        # No "_installed" marker means the self-updater never wrote this file.
+        # The app still knows its own version from web/index.html
+        # (window.IEB_APP_VERSION) — read it from disk so /api/app-version
+        # always agrees with the badge in the UI.  Without this, a repo/zip
+        # checkout reported the stale fallback below and the update dialog
+        # kept re-appearing even after installing the same release.
+        idx = os.path.join(ROOT, "web", "index.html")
+        mver = None
+        try:
+            import re as _re
+            with open(idx, encoding="utf-8") as fh:
+                mm = _re.search(r'IEB_APP_VERSION\s*=\s*"([^"]+)"', fh.read())
+                if mm:
+                    mver = mm.group(1)
+        except Exception:
+            pass
+        if mver:
+            out = {"version": mver}
+            if isinstance(j, dict):
+                for k in ("changelogVersions", "date"):
+                    if k in j:
+                        out[k] = j[k]
+            return out
     except Exception:
         pass
-    return {"version": "1.3"}   # fallback for very old installs w/o marker
+    return {"version": "1.0.0"}   # fallback for very old installs
 
 
 INSTALLED_MARK = {"_installed"}  # appended by apply_app_update at install time

@@ -83,8 +83,8 @@
      dialog always shows ONLY the changes of the release being offered —
      older versions are listed under a collapsible "full changelog". */
   function normalizeChangelog(m) {
-    var byVer = m.changelogVersions || m.changelogByVersion || null;
-    if (byVer && typeof byVer === "object" && !Array.isArray(byVer)) {
+    var byVer = mergeChangelogSources(m);
+    if (Object.keys(byVer).length) {
       var vers = Object.keys(byVer).sort(cmpVer).reverse();   /* newest first */
       return {
         current: [].concat(byVer[m.version] || []),
@@ -97,10 +97,39 @@
     return { current: flat.slice(), history: [] };
   }
 
+  /* The hub manifest is a *release* manifest; the locally installed copy of
+     app_version.json carries only "version" (+ maybe "_installed"), so after
+     an update /api/app-version cannot provide per-version entries.  Merge
+     every known source and fall back to the remote release notes, so the
+     dialog never shows an empty changelog. */
+  var REMOTE_CHANGELOG = null;             /* last fetched changelogVersions */
+
+  function mergeChangelogSources(m) {
+    var srcs = [m.changelogVersions, m.changelogByVersion];
+    try {
+      var s = localStorage.getItem("ieb-last-release-manifest");
+      if (s) { var p = JSON.parse(s); srcs.push(p.changelogVersions, p.changelogByVersion); }
+    } catch (e) {}
+    if (REMOTE_CHANGELOG) srcs.push(REMOTE_CHANGELOG);
+    var merged = {};
+    srcs.forEach(function (byVer) {
+      if (!byVer || typeof byVer !== "object" || Array.isArray(byVer)) return;
+      Object.keys(byVer).forEach(function (v) {
+        var cur = merged[v] || [];
+        [].concat(byVer[v] || []).forEach(function (item) {
+          if (cur.indexOf(item) < 0) cur.push(item);
+        });
+        merged[v] = cur;
+      });
+    });
+    return merged;
+  }
+
   function renderChangelogHtml(cl) {
-    var li = cl.current.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("");
+    var items = (cl.current && cl.current.length) ? cl.current : ["No changelog provided."];
+    var li = items.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("");
     var out = "<b>What's new in v" + esc(cl._ver || "") + "</b><ul style=\"margin:8px 0 0 0\">" +
-      (li || "<li>No changelog provided.</li>") + "</ul>";
+      li + "</ul>";
     if (cl.history.length) {
       out += "<details style=\"margin-top:10px\"><summary style=\"cursor:pointer;opacity:.75\">" +
         "Full changelog (older versions)</summary>";
@@ -129,10 +158,15 @@
     var j = await res.json();
     if (!j || !j.version) throw new Error("bad manifest");
     j._sha = sha;
+    /* remember the release notes locally: after a self-update the installed
+       app_version.json may be stripped of changelog data, but the dialog
+       should still render the notes of the release being offered */
+    REMOTE_CHANGELOG = j.changelogVersions || j.changelogByVersion || REMOTE_CHANGELOG;
+    try { localStorage.setItem("ieb-last-release-manifest", JSON.stringify(j)); } catch (e) {}
     return j;
   }
 
-  /* ------------------------------------------------------- local version */
+    /* ------------------------------------------------------- local version */
   var LOCAL_VERSION = null;                  /* cached from the server */
 
   function normalizeVer(v) {
