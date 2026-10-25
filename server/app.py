@@ -245,6 +245,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.end_headers()
                 return self.wfile.write(body)
 
+            # GET /api/app-version                     -> locally bundled app
+            # version (read by web/update.js). Served from disk so a
+            # self-update changes the reported version without a restart.
+            if parts == ["api", "app-version"]:
+                return self._send_json(loader.read_app_version())
+
             # GET /api/drafts                          -> saved editor drafts
             if parts == ["api", "drafts"]:
                 return self._send_json({"drafts": loader.list_drafts()})
@@ -396,6 +402,23 @@ class Handler(BaseHTTPRequestHandler):
                     ids = list(ids) + [body["packageId"]]
                 done = [loader.remove_installed_course(pid) for pid in ids if pid]
                 return self._send_json({"ok": True, "results": done})
+
+            # ---- APP SELF-UPDATE -------------------------------------------------
+            # POST /api/app-update?key=<admin>  -> install a new app version.
+            # The browser (web/update.js) has already downloaded the release's
+            # files from GitHub; here they are written into the app folder
+            # after strict path validation. Requires the founder key — this is
+            # the most privileged endpoint in the app.
+            if parts == ["api", "app-update"]:
+                self._require_admin(urllib.parse.parse_qs(parsed.query))
+                res = loader.apply_app_update(body.get("files") or [])
+                return self._send_json(res)
+
+            # POST /api/app-update/rollback?key=<admin> -> undo a self-update
+            # using the .app-backup/ copies taken right before overwriting.
+            if parts == ["api", "app-update", "rollback"]:
+                self._require_admin(urllib.parse.parse_qs(parsed.query))
+                return self._send_json(loader.rollback_app_update())
 
             # POST /api/drafts/<name>                 -> autosave an editor draft
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "drafts":

@@ -1495,6 +1495,7 @@
     contentDigest: contentDigest, packContentChanged: packContentChanged,
     rememberContent: rememberPackContent,
     rememberPackContent: rememberPackContent,
+    ghFetch: ghFetch, apiBase: apiBase, rawUrl: rawUrl,
     listInstalled: listInstalledPacks, installPack: installPack };
   }
   if (typeof window !== "undefined") window.IEB_SYNC = module_exports_sync();

@@ -1115,6 +1115,9 @@ def validate_manifest(m: Any) -> dict:
         value["contributors"] = m["contributors"][:20]
     if m.get("localModified") is True:
         value["localModified"] = True
+    src = _s(m.get("source"))
+    if src:
+        value["source"] = src  # "shared" marks hub-installed courses (admin cleanup)
     if not value.get("created"):
         value["created"] = __import__("datetime").date.today().isoformat()
     value.update(books)
@@ -1586,16 +1589,105 @@ def import_pack(pack: dict, new_id: Optional[str] = None) -> dict:
     payload = {"manifest": pack.get("manifest"), "books": pack.get("books"), "assets": pack.get("assets")}
     if new_id:
         payload["manifest"] = dict(payload["manifest"] or {}, id=slugify(new_id))
-    # stamp the passport into the manifest so re-imports update instead of copy
+    # stamp the passport into the manifest so re-imports update instead of copy;
+    # source=="shared" also marks the course as hub-installed, which lets the
+    # admin panel's "remove from this computer too" (and sync cleanup) delete
+    # it — locally authored or bundled courses can never be removed that way.
     payload["manifest"] = dict(payload["manifest"] or {},
                                packageId=package_id, revision=info["revision"],
-                               fingerprint=info["fingerprint"])
+                               fingerprint=info["fingerprint"], source="shared")
     res = create_textbook(payload)
     res.update({"action": "install", "packageId": package_id, "revision": info["revision"]})
     return res
 
 
 # ------------------------------------------------------------- hub admin
+# ------------------------------------------------------------- app updater
+APP_VERSION_FILE = os.path.join(ROOT, "app_version.json")
+
+
+def read_app_version() -> dict:
+    """The locally bundled app version (root app_version.json)."""
+    try:
+        with open(APP_VERSION_FILE, encoding="utf-8") as fh:
+            j = json.load(fh)
+        return j if isinstance(j, dict) else {}
+    except Exception:
+        return {}
+
+
+def _safe_update_target(rel: str) -> str:
+    """Resolve a hub-relative file path inside ROOT, refusing escapes."""
+    rel = str(rel or "").strip().lstrip("/")
+    if not rel or rel.startswith(".") or "\x00" in rel:
+        raise TextbookError("bad update file name")
+    target = os.path.realpath(os.path.join(ROOT, rel))
+    root_real = os.path.realpath(ROOT) + os.sep
+    if not (target + os.sep).startswith(root_real) and target != os.path.realpath(ROOT):
+        raise TextbookError("update file escapes the app folder: " + rel)
+    return target
+
+
+def apply_app_update(files: list) -> dict:
+    """Self-update: write freshly downloaded app files into the app folder.
+
+    The browser side (web/update.js) downloads the new release's files from
+    GitHub; the server validates each path and overwrites only plain files
+    (never directories, never symlinks outside the app folder).  The previous
+    version of every overwritten file is saved under .app-backup/ so the
+    teacher can roll back with POST /api/app-update/rollback.
+
+    Returns {"ok", "written": [rel...], "backup": bool}.
+    """
+    if not isinstance(files, list) or not files:
+        raise TextbookError("no files to install")
+    backup_dir = os.path.join(ROOT, ".app-backup")
+    written: list = []
+    for item in files:
+        rel = str((item or {}).get("path") or "")
+        content = (item or {}).get("content")
+        b64 = bool((item or {}).get("base64"))
+        if not isinstance(content, str):
+            raise TextbookError("file %s has no content" % rel)
+        target = _safe_update_target(rel)
+        if os.path.isdir(target):
+            raise TextbookError("refusing to overwrite a directory: " + rel)
+        if os.path.islink(target):
+            raise TextbookError("refusing to write through a symlink: " + rel)
+        data = base64.b64decode(content) if b64 else content.encode("utf-8")
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        if os.path.isfile(target):
+            # keep one pristine copy of every file we are about to replace
+            prev = os.path.join(backup_dir, rel.replace(os.sep, "/"))
+            os.makedirs(os.path.dirname(prev), exist_ok=True)
+            if not os.path.exists(prev):
+                shutil.copy2(target, prev)
+        with open(target, "wb") as fh:
+            fh.write(data)
+        written.append(rel)
+    invalidate_cache()
+    return {"ok": True, "written": written, "backup": os.path.isdir(backup_dir)}
+
+
+def rollback_app_update() -> dict:
+    """Restore the pre-update copies kept in .app-backup/ (then remove them)."""
+    backup_dir = os.path.join(ROOT, ".app-backup")
+    if not os.path.isdir(backup_dir):
+        raise TextbookError("no backup found — nothing to roll back")
+    restored: list = []
+    for dirpath, _dirnames, filenames in os.walk(backup_dir):
+        for fn in filenames:
+            src = os.path.join(dirpath, fn)
+            rel = os.path.relpath(src, backup_dir)
+            target = _safe_update_target(rel)
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            shutil.copy2(src, target)
+            restored.append(rel.replace(os.sep, "/"))
+    shutil.rmtree(backup_dir, ignore_errors=True)
+    invalidate_cache()
+    return {"ok": True, "restored": restored}
+
+
 def list_hub_packs() -> list:
     """Every flat .iebpack.json sitting in shared-exercises/ (the course hub).
 
