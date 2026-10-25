@@ -1275,15 +1275,58 @@
          previously-known courses were refreshed;
        * an install failure must land in errors, never silently inflate the
          success counters. */
+  /* forget a course everywhere it is remembered on this machine: the local
+     sync registry, and — in server mode when the founder key is available —
+     the installed folder under textbooks/ (see /api/admin/hub-remove-local).
+     Used when a hub course was deleted upstream. */
+  async function uninstallPackLocal(packageId) {
+    var r = syncRegistry();
+    if (r[packageId]) { delete r[packageId]; syncStorage().setItem("ieb-sync-installed", JSON.stringify(r)); }
+    var akey = null;
+    try { akey = syncStorage().getItem("ieb-admin-key") || ""; } catch (e) {}
+    try {
+      if (akey && typeof fetch === "function" && typeof location !== "undefined" &&
+          (location.protocol === "http:" || location.protocol === "https:") &&
+          /^(localhost|127\.|\[::1\])/.test(location.hostname)) {
+        await fetch("/api/admin/hub-remove-local?key=" + encodeURIComponent(akey), {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ packageIds: [packageId] })
+        });
+      }
+    } catch (e2) { /* no backend — browser-only state already cleaned */ }
+  }
+
   async function syncPull(onProgress) {
     var cfg = await syncResolveHubBranch(syncConfig());
-    var result = { added: [], updated: [], skipped: [], merged: [], errors: [], offline: false, note: "", listed: 0 };
+    var result = { added: [], updated: [], skipped: [], merged: [], removed: [], errors: [], offline: false, note: "", listed: 0 };
     var listed;
     try {
       listed = await syncListPacks(cfg);
     } catch (e) {
       result.errors.push("Cannot reach GitHub: " + e.message);
       return result;
+    }
+    /* DELETIONS PROPAGATE: courses we previously installed from the hub that
+       are no longer in the remote folder were deleted by their author (or by
+       the admin panel) — remove them locally too so teachers' lists mirror
+       the hub exactly. Only for a fresh (non-offline, non-empty) listing. */
+    var listedPacks = (listed && listed.packs) || [];
+    if (!listed.offline && listedPacks.length) {
+      try {
+        var remoteIds = {};
+        listedPacks.forEach(function (p) {
+          remoteIds[/\.iebpack\.json$/i.test(p.name) ? p.name.replace(/\.iebpack\.json$/i, "") : p.name] = true;
+        });
+        var reg = syncRegistry();
+        Object.keys(reg).forEach(function (pid) {
+          var ent = reg[pid] || {};
+          if (ent.remotePath && !remoteIds[pid] && !ent.localModified) {
+            result.removed.push(pid);
+            delete reg[pid];   /* browser-side bookkeeping happens instantly */
+          }
+        });
+        syncStorage().setItem("ieb-sync-installed", JSON.stringify(reg));
+      } catch (eDel) { /* bookkeeping only — never fail the pull over it */ }
     }
     result.offline = !!listed.offline;
     if (listed.note) result.note = listed.note;
@@ -1448,6 +1491,7 @@
     deletePack: syncDeletePack,
     pull: syncPull, pushPack: syncPushPack,
     registry: syncRegistry, registrySet: syncRegistrySet,
+    uninstallPackLocal: uninstallPackLocal,
     contentDigest: contentDigest, packContentChanged: packContentChanged,
     rememberContent: rememberPackContent,
     rememberPackContent: rememberPackContent,

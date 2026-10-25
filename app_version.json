@@ -1,0 +1,14 @@
+{
+  "version": "1.0.0",
+  "date": "2026-10-25",
+  "changelog": [
+    "Initial public release of IntExeBook.",
+    "30 exercise types: audio, video, text, speaking and more.",
+    "Shared hub sync via GitHub branch shared-hub.",
+    "Admin panel (Konami code) to publish/edit/delete courses in the hub.",
+    "Dark theme, search, offline file:// mode."
+  ],
+  "download": {
+    "zip": "https://github.com/Avokadiy/IntExeBook/archive/refs/heads/shared-hub.zip"
+  }
+}

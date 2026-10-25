@@ -169,6 +169,56 @@ function test(name, fn) {
     assert.ok(threw && /token/i.test(threw.message), "clear no-token error: " + (threw && threw.message));
   });
 
+  /* ------------------------------------------------ deletion propagation */
+
+  await test("courses deleted from the hub are forgotten locally on next pull", async () => {
+    Object.keys(store).forEach(k => delete store[k]);
+    // we previously installed pkg-gone and pkg-stay from the hub
+    SYNC.registrySet("pkg-gone", { remotePath: "shared-exercises/pkg-gone.iebpack.json", revision: 1 });
+    SYNC.registrySet("pkg-stay", { remotePath: "shared-exercises/pkg-stay.iebpack.json", revision: 1,
+                                   fingerprint: "fp-stay" });
+    fetchHandler = (url) => {
+      const u = String(url);
+      if (u.includes("/contents/shared-exercises?")) {
+        return jsonResponse([{ name: "pkg-stay.iebpack.json", path: "shared-exercises/pkg-stay.iebpack.json", sha: "s", size: 1 }]);
+      }
+      if (u.includes("raw.githubusercontent.com")) {
+        return jsonResponse({ format: "ieb-pack", packageId: "pkg-stay", revision: 1,
+                              fingerprint: "fp-stay", manifest: { title: "Stay" }, books: {} });
+      }
+      return jsonResponse({}, 404);
+    };
+    const res = await SYNC.pull();
+    assert.deepStrictEqual(res.removed, ["pkg-gone"], "gone course must be reported as removed");
+    assert.strictEqual(SYNC.registry()["pkg-gone"], undefined, "registry must forget the gone course");
+    assert.ok(SYNC.registry()["pkg-stay"], "still-published course stays registered");
+    assert.strictEqual(res.errors.length, 0, "no errors: " + JSON.stringify(res.errors));
+  });
+
+  await test("offline listing never triggers local deletions", async () => {
+    Object.keys(store).forEach(k => delete store[k]);
+    SYNC.registrySet("pkg-b", { remotePath: "shared-exercises/pkg-b.iebpack.json", revision: 1 });
+    fetchHandler = async () => { throw new Error("network down"); };
+    const res = await SYNC.pull();
+    assert.ok(res.errors.length, "network failure surfaces as an error, not silence");
+    assert.strictEqual((res.removed || []).length, 0, "offline must not delete anything");
+    assert.ok(SYNC.registry()["pkg-b"], "registry untouched while offline");
+  });
+
+  await test("empty hub listing does not mass-delete local courses", async () => {
+    Object.keys(store).forEach(k => delete store[k]);
+    SYNC.registrySet("pkg-mine", { remotePath: "shared-exercises/pkg-mine.iebpack.json", revision: 2, localModified: true });
+    fetchHandler = (url) => {
+      const u = String(url);
+      if (u.includes("/contents/shared-exercises?")) return jsonResponse([]);  // empty folder
+      return jsonResponse({}, 404);
+    };
+    const res = await SYNC.pull();
+    assert.strictEqual((res.removed || []).length, 0, "empty listing must not mass-delete");
+    assert.ok(SYNC.registry()["pkg-mine"], "local course survives an empty hub listing");
+    assert.ok(/empty/i.test(res.note), "note explains the hub is empty");
+  });
+
   process.exitCode = failures ? 1 : 0;
   console.log(failures ? failures + " test(s) failed" : "all tests passed");
 })();

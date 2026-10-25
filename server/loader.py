@@ -1671,6 +1671,51 @@ def delete_hub_pack(fname: str) -> bool:
     return True
 
 
+def remove_installed_course(package_id: str) -> dict:
+    """Delete a course previously installed from the shared hub.
+
+    Called when Sync notices that a course we installed earlier is no longer
+    published in the hub (the author or the admin panel removed it upstream),
+    and by the admin panel's local cleanup. Only folders whose manifest says
+    source == "shared" are touched — bundled textbooks and locally created
+    courses can never be deleted through this path.
+    """
+    package_id = str(package_id or "").strip()
+    if not package_id or "/" in package_id or "\\" in package_id or package_id.startswith("."):
+        raise TextbookError("bad package id")
+    removed: list = []
+    for base_dir in (TEXTBOOKS_DIR, SHARED_DIR):
+        if not os.path.isdir(base_dir):
+            continue
+        for entry in sorted(os.listdir(base_dir)):
+            folder = os.path.join(base_dir, entry)
+            if not os.path.isdir(folder) or entry.startswith((".", "_")):
+                continue
+            try:
+                mpath = _find_manifest(folder)
+                if not mpath:
+                    continue
+                mf = _read_manifest(mpath)
+            except Exception:
+                continue
+            if mf.get("packageId") != package_id:
+                continue
+            if str(mf.get("source", "")) != "shared":
+                continue  # safety: only hub-installed copies are removable
+            shutil.rmtree(folder, ignore_errors=True)
+            removed.append(entry)
+    # flat pack leftovers inside shared-exercises/
+    flat = os.path.join(SHARED_DIR, package_id + PACK_EXT)
+    if os.path.isfile(flat):
+        try:
+            os.remove(flat)
+            removed.append(os.path.basename(flat))
+        except OSError:
+            pass
+    invalidate_cache()
+    return {"packageId": package_id, "removed": removed}
+
+
 def save_hub_pack(fname: str, pack: dict) -> dict:
     """Validate and overwrite an existing hub pack (admin edit flow).
 

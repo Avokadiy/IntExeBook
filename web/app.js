@@ -224,6 +224,17 @@ async function doSync(reconfigure) {
       else if (!res.errors.length) bits.push("Nothing changed.");
     }
     if (res.offline)        bits.push("(offline — showing last known list, nothing was installed)");
+    /* courses deleted from the hub are removed locally too (admin panel /
+       GitHub deletions propagate to every teacher on the next Update).
+       uninstallPackLocal forgets the registry entry in every mode and also
+       deletes the installed folder through the founder-protected cleanup
+       endpoint when this machine knows the admin key. */
+    if (res.removed && res.removed.length) {
+      for (var ri = 0; ri < res.removed.length; ri++) {
+        try { await SYNC.uninstallPackLocal(res.removed[ri]); } catch (e) {}
+      }
+      bits.push("🗑 removed from hub (deleted locally): " + res.removed.join(", "));
+    }
     if (res.errors.length)  bits.push("⚠ " + res.errors.join("; "));
     const ok = !res.errors.length && (res.added.length + res.updated.length + res.merged.length > 0);
     toast("🔄 Sync finished\n" + bits.join("\n"), res.errors.length ? "bad" : (ok ? "ok" : "warn"));
@@ -2041,7 +2052,7 @@ window.IEB_APP = {
       if (!brand._akBound) { brand.addEventListener("click", founderMode); brand._akBound = true; }
     }
     const ver = document.getElementById("appVersion");
-    if (ver) ver.textContent = "v1.0 · akkaki edition";
+    if (ver) ver.textContent = "v" + (window.IEB_APP_VERSION || "1.0") + " · akkaki edition";
     /* the FULL show fires immediately — no extra click needed */
     founderMode();
   }
@@ -2049,7 +2060,7 @@ window.IEB_APP = {
     const b = document.getElementById("brandHome");
     if (b) { b.textContent = "✨ 📖 IntExeBook"; b.addEventListener("click", founderMode); }
     const v = document.getElementById("appVersion");
-    if (v) v.textContent = "v1.0 · akkaki edition";
+    if (v) v.textContent = "v" + (window.IEB_APP_VERSION || "1.0") + " · akkaki edition";
   } else if (unlocked) {
     document.addEventListener("DOMContentLoaded", activateEggSilently, { once: true });
   }
@@ -2057,7 +2068,7 @@ window.IEB_APP = {
     const b = document.getElementById("brandHome");
     if (b) { b.textContent = "✨ 📖 IntExeBook"; b.title = "You found it."; b.addEventListener("click", founderMode); }
     const v = document.getElementById("appVersion");
-    if (v) v.textContent = "v1.0 · akkaki edition";
+    if (v) v.textContent = "v" + (window.IEB_APP_VERSION || "1.0") + " · akkaki edition";
   }
 
   function founderMode(e) {

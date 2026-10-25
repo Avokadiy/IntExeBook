@@ -384,6 +384,19 @@ class Handler(BaseHTTPRequestHandler):
                 res["ok"] = True
                 return self._send_json(res)
 
+            # POST /api/admin/hub-remove-local?key=<admin>  -> forget a hub
+            # course that was deleted upstream (sync cleanup). Only courses
+            # whose manifest has source=="shared" are ever removed. The app
+            # itself calls this endpoint from syncPull's local-cleanup step,
+            # so it uses the same founder key as the rest of /api/admin/*.
+            if parts == ["api", "admin", "hub-remove-local"]:
+                self._require_admin(urllib.parse.parse_qs(parsed.query))
+                ids = body.get("packageIds") or []
+                if body.get("packageId"):
+                    ids = list(ids) + [body["packageId"]]
+                done = [loader.remove_installed_course(pid) for pid in ids if pid]
+                return self._send_json({"ok": True, "results": done})
+
             # POST /api/drafts/<name>                 -> autosave an editor draft
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "drafts":
                 loader.save_draft(parts[2], body)
