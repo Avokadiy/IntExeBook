@@ -190,12 +190,65 @@
       btn("🗑 Delete", "btn-ghost danger", async () => {
         if (!confirm("Delete “" + (p.title || p.file) + "” from the shared hub?\nTeachers who already installed it keep their local copy; new syncs will no longer offer this course.")) return;
         try {
-          await api("DELETE", "/api/admin/hub/" + encodeURIComponent(p.file));
-          toast("Deleted “" + (p.title || p.file) + "” from the hub", "ok");
+          await deleteHubPack(p);
           renderAdmin();
         } catch (e) { toast("Delete failed: " + e.message, "bad"); }
       }),
     ]);
+  }
+
+  /* ------------------------------------------------------ hub write paths
+     The single source of truth for published courses is the GitHub branch
+     shared-hub (folder shared-exercises/). Whenever a GitHub token is
+     configured in Sync settings, admin writes go there FIRST and only then
+     are mirrored to the local server folder — so deleting a course in the
+     panel really removes the file from git as well. Without a token we
+     fall back to the local /api/admin/hub endpoints and warn the user that
+     the git hub was not touched. */
+  function syncCfgOrThrow() {
+    const SYNC = window.IEB_SYNC;
+    if (!SYNC || typeof SYNC.config !== "function") throw new Error("Sync module is not loaded");
+    const cfg = SYNC.config();
+    if (!cfg || !cfg.token) throw new Error("no-token");
+    return cfg;
+  }
+
+  async function removeFromGitHub(name) {
+    const cfg = syncCfgOrThrow();
+    return window.IEB_SYNC.deletePack(cfg, name);
+  }
+
+  async function deleteHubPack(p) {
+    let gh = null, ghErr = null, localOk = false;
+    try {
+      gh = await removeFromGitHub(p.file);           // 1) remove from the git hub branch
+    } catch (e) {
+      ghErr = (/no-token/.test(e.message)) ? "no-token" : (e.message || String(e));
+    }
+    try {                                            // 2) remove the local mirror too
+      await api("DELETE", "/api/admin/hub/" + encodeURIComponent(p.file));
+      localOk = true;
+    } catch (e) { /* local file may already be gone — not fatal when git succeeded */ }
+    if (gh && gh.deleted) {
+      toast("Deleted “" + (p.title || p.file) + "” from the GitHub hub ✔" +
+            (localOk ? " (and locally)" : ""), "ok");
+      return;
+    }
+    if (gh && gh.missing) {
+      toast("The file was already absent in the git hub — removed the local copy" +
+            (localOk ? " ✔" : ""), "warn");
+      return;
+    }
+    if (ghErr === "no-token") {
+      if (localOk) toast("⚠ Deleted LOCALLY only — no GitHub token configured, the course still lives in the shared-hub branch. Add a token in Settings → Sync.", "warn");
+      else throw new Error("nothing was deleted: no GitHub token and the local file could not be removed");
+      return;
+    }
+    if (localOk) {
+      toast("⚠ Local copy deleted, but GitHub removal failed: " + ghErr, "warn");
+      return;
+    }
+    throw new Error(ghErr || "delete failed");
   }
 
   function downloadFile(name, text) {

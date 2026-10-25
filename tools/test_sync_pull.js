@@ -134,6 +134,41 @@ function test(name, fn) {
     assert.ok(res.errors.some(e => /pkg-test-2/.test(e)), "error names the pack: " + res.errors);
   });
 
+  /* ---------------- admin hub delete (git + local mirror) --------------- */
+  await test("deletePack sends DELETE to the Contents API with the blob sha", async () => {
+    Object.keys(store).forEach(k => delete store[k]);
+    const calls = [];
+    fetchHandler = (url, opts) => {
+      const u = String(url);
+      calls.push({ url: u, method: (opts && opts.method) || "GET", body: opts && opts.body });
+      if (u.includes("/contents/shared-exercises/") && ((opts && opts.method) || "GET") === "GET") {
+        return jsonResponse({ name: "x.iebpack.json", path: "shared-exercises/x.iebpack.json", sha: "abc123" });
+      }
+      if (((opts && opts.method) || "") === "DELETE") return jsonResponse({ commit: {} });
+      return jsonResponse({}, 404);
+    };
+    SYNC.saveConfig({ owner: "o", repo: "r", branch: "shared-hub", folder: "shared-exercises", token: "t-1" });
+    const cfg = SYNC.config();
+    const res = await SYNC.deletePack(cfg, "x.iebpack.json");
+    assert.strictEqual(res.deleted, true);
+    const del = calls.find(c => c.method === "DELETE");
+    assert.ok(del, "a DELETE request was made");
+    const body = JSON.parse(del.body);
+    assert.strictEqual(body.sha, "abc123", "delete carries the current blob sha");
+    assert.strictEqual(body.branch, "shared-hub");
+    assert.ok(del.url.includes("shared-exercises/x.iebpack.json"), "path keeps literal slashes: " + del.url);
+    assert.ok(!del.url.includes("%2F"), "folder part must NOT be percent-encoded (GitHub treats %2F as a file name): " + del.url);
+  });
+
+  await test("deletePack without a token fails loudly (never pretends success)", async () => {
+    Object.keys(store).forEach(k => delete store[k]);
+    fetchHandler = () => { throw new Error("network must not be used"); };
+    SYNC.saveConfig({ owner: "o", repo: "r", branch: "shared-hub", folder: "shared-exercises", token: "" });
+    let threw = null;
+    try { await SYNC.deletePack(SYNC.config(), "x.iebpack.json"); } catch (e) { threw = e; }
+    assert.ok(threw && /token/i.test(threw.message), "clear no-token error: " + (threw && threw.message));
+  });
+
   process.exitCode = failures ? 1 : 0;
   console.log(failures ? failures + " test(s) failed" : "all tests passed");
 })();

@@ -1393,10 +1393,59 @@
     return { name: name };
   }
 
+  /* delete one pack file from the shared hub branch (admin panel).
+     Uses the Contents API DELETE with the file's current blob sha; a stale
+     sha (file changed since listing) is refreshed once and retried. */
+  async function syncDeletePack(cfg, name) {
+    cfg = cfg || await syncResolveHubBranch(syncConfig());
+    if (!cfg.token) throw new Error("No GitHub token configured for sync");
+    /* GitHub treats "/" as a path separator, so the folder part must stay
+       literal — only the file name gets percent-encoded. */
+    var path = cfg.folder + "/" + name;
+    var apiPath = cfg.folder + "/" + encodeURIComponent(name);
+    var headers = { Authorization: "Bearer " + cfg.token, Accept: "application/vnd.github+json" };
+    async function fetchSha() {
+      var r = await ghFetch(apiBase(cfg) + "/contents/" + apiPath
+                            + "?ref=" + encodeURIComponent(cfg.branch), { headers: headers });
+      var j = await r.json();
+      return j && j.sha;
+    }
+    var sha = null;
+    try { sha = await fetchSha(); } catch (e) { return { deleted: false, missing: true }; }
+    var body = { message: "admin(hub): remove " + name, branch: cfg.branch, sha: sha };
+    try {
+      await ghFetch(apiBase(cfg) + "/contents/" + apiPath, {
+        method: "DELETE", headers: headers, body: JSON.stringify(body)
+      });
+    } catch (e) {
+      /* conflict (409) — someone changed the file after we listed it:
+         grab the fresh sha and retry exactly once */
+      if (!/HTTP 409/.test(String(e.message))) throw e;
+      try {
+        body.sha = await fetchSha();
+        await ghFetch(apiBase(cfg) + "/contents/" + apiPath, {
+          method: "DELETE", headers: headers, body: JSON.stringify(body)
+        });
+      } catch (e2) {
+        if (/HTTP 404/.test(String(e2.message))) return { deleted: false, missing: true };
+        throw e2;
+      }
+    }
+    /* drop our content-digest memory so a future re-publish of the same
+       packageId is not mistaken for "already up to date" */
+    try {
+      var pid = name.replace(/\.iebpack\.json$/i, "");
+      var reg2 = syncRegistry();
+      if (reg2[pid]) { delete reg2[pid].contentHash; syncRegistrySet(pid, reg2[pid]); }
+    } catch (e3) {}
+    return { deleted: true, path: path };
+  }
+
   /* expose the sync API on the global object (browsers) and via exports */
   function module_exports_sync() { return {
     DEFAULTS: SYNC_DEFAULTS, config: syncConfig, saveConfig: saveSyncConfig,
     listPacks: syncListPacks, downloadPack: syncDownloadPack, uploadPack: syncUploadPack,
+    deletePack: syncDeletePack,
     pull: syncPull, pushPack: syncPushPack,
     registry: syncRegistry, registrySet: syncRegistrySet,
     contentDigest: contentDigest, packContentChanged: packContentChanged,
