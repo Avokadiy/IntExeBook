@@ -287,14 +287,14 @@
     b.id = "updateBtn";
     b.className = "theme-toggle btn-text";
     b.type = "button";
-    b.title = "Check for a new version of the app";
-    b.textContent = "⬆ Updates";
+    b.title = "Check for a new app release (not course sync — that is the 🔄 Update button)";
+    b.textContent = "🆕 App v1.3";
     b.addEventListener("click", function () {
       b.disabled = true; b.textContent = "⏳ …";
       check(true).catch(function () {}).then(function () {
-        b.disabled = false; b.textContent = "⬆ Updates";
+        b.disabled = false; b.textContent = "🆕 App v1.3";
       });
-      setTimeout(function () { b.disabled = false; b.textContent = "⬆ Updates"; }, 8000);
+      setTimeout(function () { b.disabled = false; b.textContent = "🆕 App v1.3"; }, 8000);
     });
     theme.parentNode.insertBefore(b, theme);
   }

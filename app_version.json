@@ -1,7 +1,9 @@
 {
-  "version": "1.2.0",
+  "version": "1.3.0",
   "date": "2026-10-25",
   "changelog": [
+    "Renamed the app-version check button to '🆕 App v1.3' — it was easy to confuse with the course-sync '🔄 Update' button; the tooltips now explain which is which.",
+    "The version badge at the bottom-left now shows the installed release (v1.3) and stays in sync with the app code.",
     "One-click self-update: the update dialog now has an '⚡ Update now' button that downloads the new app files from GitHub and installs them straight into your folder — no manual ZIP handling anymore (courses and settings are untouched; a backup of replaced files is kept).",
     "The header version badge and the update checker now read the installed version live from disk, so after an update the app immediately reports the new one.",
     "Hub-installed courses are properly marked as shared, so the admin panel can also remove them from the computer.",
