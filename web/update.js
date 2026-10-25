@@ -28,13 +28,27 @@
     return { owner: d.owner, repo: d.repo, branch: d.branch };
   }
 
-  function manifestUrl(c) {
-    /* NOTE: raw.githubusercontent.com caches per-URL and ignores unknown query
-       params like ?nocache — a plain fetch can keep serving a stale manifest
-       for minutes after a push. cache:"reload" (used in fetchManifest) forces
-       the browser to revalidate against origin. */
+  function manifestUrl(c, sha) {
+    /* raw.githubusercontent.com caches branch refs for minutes and ignores
+       unknown query params like ?nocache — that made freshly pushed releases
+       invisible ("you are on the latest 1.0.0"). We now resolve the branch
+       HEAD via the API (cached ~60 s, never stale beyond that) and fetch the
+       manifest from a SHA-pinned raw URL, which is immutable and always fresh. */
+    if (sha) {
+      return "https://raw.githubusercontent.com/" + c.owner + "/" + c.repo +
+        "/" + sha + "/app_version.json";
+    }
     return "https://raw.githubusercontent.com/" + c.owner + "/" + c.repo +
       "/" + c.branch + "/app_version.json?nocache=" + Date.now();
+  }
+
+  async function branchHeadSha(c) {
+    var api = "https://api.github.com/repos/" + c.owner + "/" + c.repo +
+      "/commits/" + encodeURIComponent(c.branch) + "?per_page=1&_=" + Date.now();
+    var res = await fetch(api, { cache: "reload", headers: { Accept: "application/vnd.github+json" } });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    var j = await res.json();
+    return j && j.sha ? j.sha : null;
   }
 
   function cmpVer(a, b) {
@@ -54,10 +68,13 @@
 
   async function fetchManifest() {
     var c = cfg();
-    /* cache:"reload" — raw.githubusercontent.com may serve a stale copy of the
-       manifest for up to ~5 min after a push (?nocache is ignored there), so
-       always revalidate against origin when checking for app updates. */
-    var res = await fetch(manifestUrl(c), { cache: "reload" });
+    /* Resolve branch HEAD through the API first (its CDN cache is ~60 s, vs
+       minutes for raw branch URLs), then read the manifest from a SHA-pinned
+       immutable URL. Fall back to the plain branch URL if the API is blocked. */
+    var sha = null;
+    try { sha = await branchHeadSha(c); } catch (e) { /* offline / rate limit */ }
+    var res = await fetch(manifestUrl(c, sha), { cache: "reload" });
+    if (!res.ok && sha) res = await fetch(manifestUrl(c, null), { cache: "reload" });
     if (!res.ok) throw new Error("HTTP " + res.status);
     var j = await res.json();
     if (!j || !j.version) throw new Error("bad manifest");
