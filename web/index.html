@@ -27,7 +27,11 @@ try {
     <div id="searchResults" class="search-results hidden"></div>
   </div>
   <a href="#/create" id="teacherBtn" class="btn btn-teacher">🛠 Create exercises</a>
-  <button id="syncBtn" class="theme-toggle" type="button" title="Update shared exercises from GitHub (🔄 Sync)">🔄 Update</button>
+  <span class="sync-wrap">
+    <button id="syncBtn" class="theme-toggle" type="button" title="Update shared exercises from GitHub (🔄 Sync)">🔄 Update</button>
+    <!-- blinking red beacon: lights up when the hub has new/changed courses -->
+    <span id="syncBeacon" class="sync-beacon" hidden aria-hidden="true"></span>
+  </span>
   <button id="themeToggle" class="theme-toggle" type="button" title="Switch theme" aria-label="Switch theme">🌙</button>
 </header>
 
@@ -50,7 +54,7 @@ try {
 <span class="app-version" id="appVersion" title="IntExeBook v1.0">v1.0</span>
 <!-- order matters: shared schema -> app (router + player engines) -> authoring editor -->
 <script src="textbooks-index.js"></script>
-<script>window.IEB_APP_VERSION = "1.0.0";</script>
+<script>window.IEB_APP_VERSION = "1.0.1";</script>
 <script src="shared.js"></script>
 <script src="app.js"></script>
 <script src="update.js"></script>

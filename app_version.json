@@ -1,7 +1,11 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "date": "2026-10-26",
   "changelogVersions": {
+    "1.0.1": [
+      "Blinking red beacon on the \"🔄 Update\" button: it lights up whenever the hub holds new or changed courses since your last sync, and goes dark after you update (tooltip lists the pending courses).",
+      "Version bumped to 1.0.1."
+    ],
     "1.0.0": [
       "Initial public release of IntExeBook.",
       "Authoring studio with 30 exercise types: audio, video, text, drag & drop, matching, quizzes and more.",

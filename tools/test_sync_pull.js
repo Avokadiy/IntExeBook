@@ -219,6 +219,61 @@ function test(name, fn) {
     assert.ok(/empty/i.test(res.note), "note explains the hub is empty");
   });
 
+  /* -------------------------------------------------- update beacon logic */
+
+  await test("beacon: new/changed files in the hub are pending until marked seen", () => {
+    const seen = {};
+    let pend = SHARED.remotePackChanged([
+      { name: "a.iebpack.json", sha: "sha-a" },
+      { name: "b.iebpack.json", sha: "sha-b" },
+    ], seen);
+    assert.strictEqual(pend.length, 2, "two never-seen files -> both pending");
+    assert.ok(pend.every(p => p.isNew), "never-seen files count as new");
+    SHARED.markSyncSeen("a.iebpack.json", "sha-a");
+    SHARED.markSyncSeen("b.iebpack.json", "sha-b");
+    pend = SHARED.remotePackChanged([
+      { name: "a.iebpack.json", sha: "sha-a" },
+      { name: "b.iebpack.json", sha: "sha-changed" },
+    ], SYNC.seenShas());
+    assert.strictEqual(pend.length, 1, "only the changed file stays pending");
+    assert.strictEqual(pend[0].name, "b.iebpack.json");
+    assert.strictEqual(pend[0].isNew, false, "changed file is an update, not new");
+  });
+
+  await test("beacon: checkForNewCourses + pull dims the lamp after installing", async () => {
+    Object.keys(store).forEach(k => delete store[k]);
+    global.location = { protocol: "http:", hostname: "localhost" };
+    const pack = { format: "ieb-pack", packageId: "pkg-beacon", revision: 1,
+                   fingerprint: "fp-b", manifest: { title: "Beacon Course" } };
+    fetchHandler = (url) => {
+      const u = String(url);
+      if (u.includes("/contents/shared-exercises?")) {
+        return jsonResponse([{ name: "pkg-beacon.iebpack.json", path: "shared-exercises/pkg-beacon.iebpack.json", sha: "sha-1", size: 1 }]);
+      }
+      if (u.includes("raw.githubusercontent.com")) return jsonResponse(pack);
+      if (u === "/api/installed-packs") return jsonResponse({ packs: [] });
+      if (u === "/api/import") return jsonResponse({ action: "install", title: "Beacon Course" });
+      return jsonResponse({}, 404);
+    };
+    let res = await SYNC.checkForNewCourses(true);
+    assert.strictEqual(res.pending.length, 1, "fresh course -> lamp blinks");
+    res = await SYNC.pull();
+    assert.strictEqual(res.added.length, 1);
+    res = await SYNC.checkForNewCourses(true);
+    assert.strictEqual(res.pending.length, 0, "after pulling, the lamp goes dark");
+    // someone edits the course upstream -> sha changes -> blink again
+    fetchHandler = (url) => {
+      const u = String(url);
+      if (u.includes("/contents/shared-exercises?")) {
+        return jsonResponse([{ name: "pkg-beacon.iebpack.json", path: "shared-exercises/pkg-beacon.iebpack.json", sha: "sha-2", size: 1 }]);
+      }
+      return jsonResponse({}, 404);
+    };
+    res = await SYNC.checkForNewCourses(true);
+    assert.strictEqual(res.pending.length, 1, "changed sha makes the lamp blink again");
+    assert.strictEqual(res.pending[0].isNew, false);
+  });
+
   process.exitCode = failures ? 1 : 0;
   console.log(failures ? failures + " test(s) failed" : "all tests passed");
 })();

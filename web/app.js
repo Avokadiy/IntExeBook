@@ -239,6 +239,7 @@ async function doSync(reconfigure) {
     const ok = !res.errors.length && (res.added.length + res.updated.length + res.merged.length > 0);
     toast("🔄 Sync finished\n" + bits.join("\n"), res.errors.length ? "bad" : (ok ? "ok" : "warn"));
     invalidateCachesAndRefresh();
+    refreshSyncBeacon(true);   /* hub state changed — re-evaluate the lamp */
   } catch (e) {
     const msg = String(e && e.message || e);
     /* auth/config problems -> offer to change the token right away */
@@ -263,6 +264,45 @@ if (syncBtn) {
   syncBtn.addEventListener("contextmenu", (ev) => { ev.preventDefault(); doSync(true); });
   syncBtn.title = "Update shared exercises. Right-click → sync settings (change token, repo, branch).";
 }
+
+/* ------------------------------------------------------- red update beacon
+   A small blinking red lamp sits on the 🔄 Update button whenever the hub
+   (shared-exercises/ on GitHub) holds courses that are NEW or CHANGED since
+   this machine last pulled/published them. Detection lives in shared.js
+   (checkForNewCourses): it lists the folder once and compares each file's
+   git blob sha against the sha we recorded as "seen". Cheap enough to run
+   periodically; failures leave the lamp dark (never nag when offline). */
+const syncBeacon = document.getElementById("syncBeacon");
+let beaconChecking = false;
+async function refreshSyncBeacon(force) {
+  if (!syncBeacon) return;
+  const SYNC = window.IEB_SYNC || (window.IEB_SHARED && window.IEB_SHARED.sync);
+  if (!SYNC || typeof SYNC.checkForNewCourses !== "function" || beaconChecking) return;
+  beaconChecking = true;
+  try {
+    const res = await SYNC.checkForNewCourses(!!force);
+    const pend = (res && res.pending) || [];
+    if (pend.length) {
+      syncBeacon.hidden = false;
+      const names = pend.map(p => p.name.replace(/\.iebpack\.json$/i, ""));
+      syncBeacon.title = "🔴 New or updated courses in the hub (" + pend.length + "):\n" +
+        names.join(", ") + "\nClick \u201c🔄 Update\u201d to download them.";
+    } else {
+      syncBeacon.hidden = true;
+      syncBeacon.removeAttribute("title");
+    }
+  } catch (e) { /* network/auth hiccup — keep the current state */ }
+  finally { beaconChecking = false; }
+}
+/* check at startup, then every 10 minutes, and whenever the tab regains
+   focus (a teacher leaving the app open all day still learns about new
+   courses promptly without hammering the GitHub API — results are cached
+   for 5 min inside checkForNewCourses itself) */
+refreshSyncBeacon();
+setInterval(() => { refreshSyncBeacon(); }, 10 * 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) refreshSyncBeacon();
+});
 
 /* ------------------------------------------------------------ helpers */
 async function loadBookMeta(tbId) {

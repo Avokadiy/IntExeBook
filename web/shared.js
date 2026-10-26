@@ -1354,6 +1354,7 @@
         var knownReg = reg[pidGuess] || null;
         var seenPath = knownReg && knownReg.remotePath === p.path;
         if (seenPath && !knownReg.localModified) {
+          markSeen(p.name, p.sha);   /* handled => beacon may go dark */
           result.skipped.push(p.name);
           continue;
         }
@@ -1361,7 +1362,7 @@
         if (!knownReg && pack.packageId) {
           knownReg = reg[pack.packageId] || null;
           seenPath = knownReg && knownReg.remotePath === p.path;
-          if (seenPath && !knownReg.localModified) { result.skipped.push(p.name); continue; }
+          if (seenPath && !knownReg.localModified) { markSeen(p.name, p.sha); result.skipped.push(p.name); continue; }
         }
         /* FIRST: compare against the exact copy we installed/published last
            time. If the exercise content is byte-for-byte equivalent there is
@@ -1370,6 +1371,7 @@
         if (packContentChanged(pack) === false) {
           if (knownReg) syncRegistrySet(pack.packageId, Object.assign({}, knownReg, { remotePath: p.path, revision: pack.revision || 1 }));
           else rememberPackContent(pack), syncRegistrySet(pack.packageId, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name });
+          markSeen(p.name, p.sha);
           result.skipped.push(p.name);
           continue;
         }
@@ -1377,6 +1379,7 @@
         if (decision.action === "duplicate") {
           rememberPackContent(pack);
           syncRegistrySet(pack.packageId, Object.assign({}, syncRegistry()[pack.packageId] || {}, { remotePath: p.path, revision: pack.revision || 1, fingerprint: pack.fingerprint, name: p.name }));
+          markSeen(p.name, p.sha);
           result.skipped.push(p.name); continue;
         }
         var install = await installPack(pack, decision);
@@ -1390,6 +1393,7 @@
         var stamped = await confirmServerPassport(pack);
         rememberPackContent(pack, { remotePath: p.path, revision: pack.revision || 1,
           fingerprint: pack.fingerprint, name: p.name, serverBlind: !stamped });
+        markSeen(p.name, p.sha);   /* installed => beacon may go dark */
         installed = await listInstalledPacks();   // keep the view fresh for later files
         var act = install.action || decision.action;
         if (act === "merge" || act === "fork") result.merged.push(install.title || p.name);
@@ -1401,6 +1405,71 @@
       }
     }
     return result;
+  }
+
+  /* ------------------------------------------------------ update beacon
+     A blinking red lamp next to the "🔄 Update" button tells the teacher
+     that the hub holds NEW or CHANGED courses since the last time this
+     machine synced/published.
+
+     How it works: every *iebpack.json file in shared-exercises/ has a git
+     blob sha (we already get it for free from the Contents API listing in
+     syncListPacks). When a course is pulled or pushed we remember that sha
+     as "seen" ("ieb-sync-seen"). The check below lists the folder ONCE
+     (cheap, no per-file downloads) and compares shas:
+       * a file we never saw            -> new course    -> pending
+       * a file whose sha changed       -> updated course -> pending
+     Results are cached for 5 minutes so periodic checks don't hammer the
+     GitHub API; force=true bypasses the cache. Any failure (offline, bad
+     token) is reported as "pending: none" — the lamp must never lie about
+     updates nor nag when the network is down. */
+  var SEEN_KEY = "ieb-sync-seen";
+  var BEACON_CACHE_MS = 5 * 60 * 1000;
+
+  function seenShas() {
+    try { return JSON.parse(syncStorage().getItem(SEEN_KEY) || "{}"); } catch (e) { return {}; }
+  }
+  function setSeenShas(m) {
+    try { syncStorage().setItem(SEEN_KEY, JSON.stringify(m)); } catch (e) {}
+  }
+  /* record the current git sha of one remote pack file as "already seen" */
+  function markSeen(name, sha) {
+    if (!name || !sha) return;
+    var m = seenShas();
+    m[name] = sha;
+    setSeenShas(m);
+  }
+  /* which files would blink right now? pure function of listing + seen map */
+  function remotePackChanged(packs, seen) {
+    var pend = [];
+    (packs || []).forEach(function (p) {
+      if (!p || !p.name) return;
+      if (!seen[p.name] || (p.sha && seen[p.name] !== p.sha)) {
+        pend.push({ name: p.name, isNew: !seen[p.name] });
+      }
+    });
+    return pend;
+  }
+  async function checkForNewCourses(force) {
+    var out = { pending: [], checkedAt: Date.now(), error: null };
+    try {
+      if (!force) {
+        var c = null;
+        try { c = JSON.parse(syncStorage().getItem("ieb-sync-beacon") || "null"); } catch (e) {}
+        if (c && Array.isArray(c.pending) && Date.now() - (c.at || 0) < BEACON_CACHE_MS) {
+          return { pending: c.pending, checkedAt: c.at, cached: true, error: null };
+        }
+      }
+      var cfg = await syncResolveHubBranch(syncConfig());
+      var listed = await syncListPacks(cfg);
+      var packs = (listed && listed.packs) || [];
+      var pend = remotePackChanged(packs, seenShas());
+      out.pending = pend;
+      try { syncStorage().setItem("ieb-sync-beacon", JSON.stringify({ at: out.checkedAt, pending: pend })); } catch (e) {}
+    } catch (e) {
+      out.error = e && e.message || String(e);
+    }
+    return out;
   }
 
   /* publish one local course pack into the shared GitHub folder */
@@ -1423,6 +1492,7 @@
           syncRegistrySet(pack.packageId, { remotePath: cfg.folder + "/" + name,
             revision: remote.revision || pack.revision || 1,
             fingerprint: pack.fingerprint, name: name });
+          markSeen(name, mine.sha);   /* unchanged on the hub => beacon dark */
           return { name: name, unchanged: true };
         }
       }
@@ -1433,6 +1503,12 @@
       remotePath: cfg.folder + "/" + name,
       revision: pack.revision || 1, fingerprint: pack.fingerprint, name: name
     });
+    /* our own fresh upload is by definition "seen" — re-list to grab its sha
+       so the beacon does not blink for the course we just published */
+    try {
+      var after = await syncListPacks(cfg);
+      (after.packs || []).forEach(function (p2) { if (p2.name === name) markSeen(name, p2.sha); });
+    } catch (e2) { /* beacon will simply blink until the next pull */ }
     return { name: name };
   }
 
@@ -1492,6 +1568,8 @@
     pull: syncPull, pushPack: syncPushPack,
     registry: syncRegistry, registrySet: syncRegistrySet,
     uninstallPackLocal: uninstallPackLocal,
+    checkForNewCourses: checkForNewCourses, markSeen: markSeen,
+    remotePackChanged: remotePackChanged, seenShas: seenShas,
     contentDigest: contentDigest, packContentChanged: packContentChanged,
     rememberContent: rememberPackContent,
     rememberPackContent: rememberPackContent,
@@ -1516,6 +1594,8 @@
     syncResolveHubBranch: syncResolveHubBranch,
     syncResolveDefaultBranch: syncResolveHubBranch,
     syncRegistry: syncRegistry, syncRegistrySet: syncRegistrySet, syncPull: syncPull,
-    syncPushPack: syncPushPack, sync: module_exports_sync()
+    syncPushPack: syncPushPack, sync: module_exports_sync(),
+    checkForNewCourses: checkForNewCourses, markSyncSeen: markSeen,
+    remotePackChanged: remotePackChanged
   };
 });
