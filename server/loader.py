@@ -1292,8 +1292,45 @@ def publish_course(payload: dict) -> dict:
         raise TextbookError("nothing to publish — the course has no content")
 
     slug = slugify(manifest["id"] or manifest["title"]) or "course"
-    folder = unique_folder(slug, SHARED_DIR)
-    name = os.path.basename(folder)
+
+    # ---- anti-duplicate: re-publishing an existing course UPDATES it in
+    # place instead of creating a second copy.  The passport (packageId +
+    # title) identifies the course; when a hub pack with the same packageId
+    # already exists we overwrite that file and bump its revision, so every
+    # teacher's next sync sees an UPDATE rather than a duplicate.
+    pack_id = str(payload.get("packageId") or manifest.get("packageId") or "")
+    prev_hub = None
+    hub_card = None
+    if pack_id:
+        try:
+            for cand in list_hub_packs():
+                if cand.get("packageId") == pack_id:
+                    hub_card = cand
+                    prev_hub = read_hub_pack(cand["file"])
+                    break
+        except Exception:
+            prev_hub = None
+    if prev_hub is not None:
+        # read_hub_pack returns the raw pack; take the base name from the card
+        hub_file = str((hub_card or {}).get("file") or "")
+        base = (hub_file[:-len(PACK_EXT)] if hub_file.endswith(PACK_EXT)
+                else os.path.splitext(hub_file)[0])
+        name = (base
+                or slugify((prev_hub.get("manifest") or {}).get("title") or slug)
+                or "course")
+        folder = os.path.join(SHARED_DIR, name)
+        try:
+            prev_rev = int(prev_hub.get("revision") or 1)
+        except (TypeError, ValueError):
+            prev_rev = 1
+        try:
+            manifest["revision"] = max(1, int(manifest.get("revision") or 1), prev_rev) + 1
+        except (TypeError, ValueError):
+            manifest["revision"] = prev_rev + 1
+        manifest["packageId"] = pack_id
+    else:
+        folder = unique_folder(slug, SHARED_DIR)
+        name = os.path.basename(folder)
     manifest["id"] = name
     manifest["source"] = "shared"
     assets = payload.get("assets") or {}

@@ -1,43 +1,14 @@
 {
-  "version": "1.7.0",
-  "date": "2026-10-25",
+  "version": "1.0.0",
+  "date": "2026-10-26",
   "changelogVersions": {
-    "1.7.0": [
-      "Fixed the empty changelog in the update dialog: release notes are now merged from every source (hub manifest, cached snapshot, local server) and a stale/empty manifest can never blank the dialog anymore.",
-      "The app-update button is now truly hidden while you are on the latest version — it appears only when a newer release exists in the hub, and any leftover static button from older builds is removed automatically on load."
-    ],
-    "1.6.0": [
-      "The \"🆕 New version?\" button is now hidden while the app is up to date — it only appears in the header when a newer release exists in the hub, and disappears again right after installing.",
-      "Version badge at the bottom-left updated to v1.6."
-    ],
-    "1.5.0": [
-      "One-click update no longer asks for a founder key — just a simple \"Install v1.4 now?\" Yes/No window (the server only accepts update requests coming from this computer).",
-      "Changelog is now grouped by version: the update dialog shows only what's new in the release being installed, with older releases under \"Full changelog\".",
-      "Fixed the update check silently reporting \"you are on the latest version\": the hub's release manifest is no longer mistaken for the locally installed version.",
-      "Renamed the header button to \"🆕 New version?\" so it can't be confused with the course-sync \"🔄 Update\" button.",
-      "Fixed the empty changelog in the update dialog: release notes are now merged from the hub manifest and cached locally, so every version block always shows its changes.",
-      "Fixed the version badge not updating after an install: the local server now reports the real installed version read straight from the app files (no more stale fallback)."
-    ],
-    "1.3.0": [
-      "Renamed the app-version check button to \"🆕 App v1.3\" — it was easy to confuse with the course-sync \"🔄 Update\" button; the tooltips now explain which is which.",
-      "The version badge at the bottom-left now shows the installed release (v1.3) and stays in sync with the app code."
-    ],
-    "1.2.0": [
-      "One-click self-update: the update dialog has an \"⚡ Update now\" button that downloads the new app files from GitHub and installs them straight into your folder — no manual ZIP handling anymore (a backup of replaced files is kept).",
-      "The header version badge and the update checker read the installed version live from disk.",
-      "Hub-installed courses are properly marked as shared, so the admin panel can also remove them from the computer."
-    ],
-    "1.1.0": [
-      "App update checker: a dialog appears when a new version is released, with the changelog and a download button.",
-      "Fixed the header \"⬆ Updates\" button shape.",
-      "Deleting a course in the admin panel now also removes it from the shared-hub git branch."
-    ],
     "1.0.0": [
       "Initial public release of IntExeBook.",
-      "Shared hub sync via GitHub branch shared-hub.",
-      "Admin panel (Konami code) to publish/edit/delete courses in the hub.",
-      "30 exercise types: audio, video, text, speaking and more (see TEST QWEN GEN demo course).",
-      "Dark theme, search, offline file:// mode."
+      "Authoring studio with 30 exercise types: audio, video, text, drag & drop, matching, quizzes and more.",
+      "Course hub: publish, edit and delete courses from the shared-hub git branch; one-click \"🔄 Update\" syncs every teacher's library (deletions propagate too).",
+      "Admin panel behind the Konami code for managing hub courses.",
+      "One-click in-app self-update: when a new release appears you get a dialog with the changes list and an \"Update now\" button — no manual file downloads.",
+      "The update button is only visible while a newer release actually exists."
     ]
   },
   "download": {

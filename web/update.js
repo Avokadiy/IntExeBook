@@ -319,7 +319,8 @@
     later.onclick = function () {
       try {
         localStorage.setItem(LS_SEEN, m.version);
-        localStorage.setItem(LS_AT, String(Date.now()));
+        /* deliberately NOT stamping LS_AT here: the next page load must be
+           free to re-check right away (session-first check is forced) */
       } catch (e) {}
       mask.remove();
     };
@@ -477,8 +478,13 @@
   function boot() {
     removeLegacyUpdateButtons();           /* never leave an old static button */
     setUpdateBtnVisible(false);            /* hidden until a newer release exists */
-    /* first check shortly after start, then periodically while open */
-    setTimeout(function () { check(false); }, 2500);
+    /* First check shortly after start.  The "checked at most every 6 h"
+       throttle must NEVER block that first check of the session — older
+       builds skipped it when a previous session had polled recently, so a
+       freshly pushed release stayed invisible (and its dialog could look
+       like leftovers of an earlier one).  The throttle only applies to the
+       periodic refresh below. */
+    setTimeout(function () { check(true); }, 2500);
     setInterval(function () { refresh(); }, POLL_MS);
   }
 

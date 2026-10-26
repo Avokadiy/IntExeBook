@@ -80,18 +80,24 @@ function loadUpdater(env, opts) {
     const env = makeEnv();
     const m = JSON.parse(fs.readFileSync(path.join(ROOT, "app_version.json"), "utf8"));
     assert.ok(!m._installed, "the published manifest must not carry _installed");
-    const u = loadUpdater(env, { localVersion: "1.3.0", manifest: m });
+    /* pin an OLD local version so any real hub release is strictly newer —
+       this keeps the test independent of the currently published number */
+    const u = loadUpdater(env, { localVersion: "0.0.1", manifest: m });
     const found = await u.api.check(true);
     assert.ok(found && found.version === m.version,
-      "v" + m.version + " release must be offered to a v1.3 install");
+      "v" + m.version + " release must be offered to a v0.0.1 install");
     console.log("ok 1 - hub manifest is never treated as the local version");
   }
 
   /* 2. changelog grouped by version -> only the new release shown ------- */
   {
     const env = makeEnv();
-    const m = JSON.parse(fs.readFileSync(path.join(ROOT, "app_version.json"), "utf8"));
-    const u = loadUpdater(env, { localVersion: "1.3.0", manifest: m });
+    /* two-version manifest: the newest is offered, the older one must land
+       under the collapsible "Full changelog" block */
+    const m = { version: "2.0.0", changelogVersions: {
+      "2.0.0": ["brand new release item"],
+      "1.0.0": ["Initial public release of IntExeBook."] } };
+    const u = loadUpdater(env, { localVersion: "0.0.1", manifest: m });
     const clHtml = [];
     env.document.createElement = () => {
       const o = { style: {}, innerHTML: "", querySelector: () => ({ style: {}, onclick: null }),
@@ -104,7 +110,9 @@ function loadUpdater(env, opts) {
     const html = clHtml.join("\n");
     assert.ok(html.includes("What&#39;s new in v") || html.includes("What's new in v"),
       "dialog must show a per-version header");
-    assert.ok(html.includes("founder key"), "current release items must be listed");
+    const firstItem = (m.changelogVersions && m.changelogVersions[m.version] || [""])[0];
+    assert.ok(firstItem && html.includes(firstItem.split(" ")[0]),
+      "current release items must be listed");
     assert.ok(html.includes("Full changelog"), "older releases go under full changelog");
     assert.ok(!/Initial public release[\s\S]*What's new/.test(html),
       "old items must not sit in the What's-new block");
