@@ -1,0 +1,1248 @@
+{
+ "format": "ieb-pack",
+ "version": 1,
+ "exported": "2026-10-26T12:44:26.000Z",
+ "generator": "IntExeBook",
+ "packageId": "pkg-halloween2026001",
+ "revision": 1,
+ "fingerprint": "9380f7eb7a7bcfab",
+ "manifest": {
+  "format": 1,
+  "id": "halloween-special",
+  "packageId": "pkg-halloween2026001",
+  "revision": 1,
+  "title": "Halloween Special 🎃",
+  "subtitle": "Interactive quests for every level",
+  "level": "Pre-learners – B2",
+  "publisher": "",
+  "author": "IntExeBook Team",
+  "description": "Five spooky topics — one per CEFR level (Pre-learners, A1, A2, B1, B2), each with 10 different interactive exercises: word searches, crosswords, ghosts, riddles and grammar for all tastes.",
+  "color": "#f97316",
+  "icon": "🎃",
+  "student": "Student's Book",
+  "created": "2026-10-26",
+  "fingerprint": "6a9aa646dbd41e73"
+ },
+ "books": {
+  "student": {
+   "format": 1,
+   "units": [
+    {
+     "id": "pre",
+     "title": "Pre-learners — Spooky Starter 🌟",
+     "lessons": [
+      {
+       "id": "pre-l1",
+       "title": "Halloween Fun for Little Ones",
+       "page": 1,
+       "tasks": [
+        {
+         "id": "pl1",
+         "type": "multiple-choice",
+         "title": "Trick or treat!",
+         "instruction": "Choose the correct word.",
+         "options": [
+          "A ghost",
+          "A rocket",
+          "A toast"
+         ],
+         "answerIndex": 0,
+         "explanation": "It is a ghost! 👻"
+        },
+        {
+         "id": "pl2",
+         "type": "true-false",
+         "title": "Pumpkin",
+         "instruction": "True or false?",
+         "text": "A pumpkin is orange.",
+         "answer": true,
+         "explanation": "Pumpkins are usually orange. 🎃"
+        },
+        {
+         "id": "pl3",
+         "type": "matching",
+         "title": "Word and picture",
+         "instruction": "Match the word to its picture name.",
+         "pairs": [
+          {
+           "left": "🎃",
+           "right": "pumpkin"
+          },
+          {
+           "left": "🦇",
+           "right": "bat"
+          },
+          {
+           "left": "🕷️",
+           "right": "spider"
+          },
+          {
+           "left": "🍬",
+           "right": "candy"
+          }
+         ]
+        },
+        {
+         "id": "pl4",
+         "type": "choose-odd-one-out",
+         "title": "Which one is different?",
+         "instruction": "Tap the word that is not an animal.",
+         "options": [
+          {
+           "text": "cat",
+           "isOdd": false
+          },
+          {
+           "text": "bat",
+           "isOdd": false
+          },
+          {
+           "text": "owl",
+           "isOdd": false
+          },
+          {
+           "text": "ball",
+           "isOdd": true
+          }
+         ],
+         "categoryHint": "animals",
+         "explanation": "A ball is a toy, not an animal!"
+        },
+        {
+         "id": "pl5",
+         "type": "word-search",
+         "title": "Hidden animals",
+         "instruction": "Find the animals in the grid.",
+         "words": [
+          "CAT",
+          "OWL",
+          "BAT",
+          "SPIDER"
+         ],
+         "grid": [
+          "QGXIBHGLK",
+          "LNTSPIDER",
+          "VGCATSHQF",
+          "EDBKBYZTY",
+          "WWPNFUCQM",
+          "GZRHYEKOA",
+          "YBCQXUYWV",
+          "LAOEGMPLB",
+          "NTIQGAHKH"
+         ]
+        },
+        {
+         "id": "pl6",
+         "type": "spelling",
+         "title": "Spell the witch",
+         "instruction": "Listen (🔊) and spell the word.",
+         "prompt": "Say it: WITCH. Now type it:",
+         "word": "witch"
+        },
+        {
+         "id": "pl7",
+         "type": "listen-choice",
+         "title": "Listen and choose",
+         "instruction": "Press 🔊 and choose what you hear.",
+         "text": "I see a black cat.",
+         "options": [
+          "I see a black cat.",
+          "I see a big hat.",
+          "I like the bat."
+         ],
+         "answerIndex": 0
+        },
+        {
+         "id": "pl8",
+         "type": "click-on-picture",
+         "title": "Find the candy",
+         "instruction": "Click on the candy spot.",
+         "image": "",
+         "hotspots": [
+          {
+           "label": "candy 🍬",
+           "x": 70,
+           "y": 60,
+           "r": 12
+          }
+         ],
+         "explanation": "Sweet candy! Don't eat too many before dinner 😉"
+        },
+        {
+         "id": "pl9",
+         "type": "translate-match",
+         "title": "Russian and English",
+         "instruction": "Match the Russian word to the English word.",
+         "pairs": [
+          {
+           "left": "тыква",
+           "right": "pumpkin"
+          },
+          {
+           "left": "привидение",
+           "right": "ghost"
+          },
+          {
+           "left": "маска",
+           "right": "mask"
+          },
+          {
+           "left": "конфета",
+           "right": "sweet"
+          }
+         ]
+        },
+        {
+         "id": "pl10",
+         "type": "memory-pairs",
+         "title": "Memory game",
+         "instruction": "Flip the cards and find matching pairs.",
+         "pairs": [
+          {
+           "front": "🎃",
+           "back": "pumpkin"
+          },
+          {
+           "front": "👻",
+           "back": "ghost"
+          },
+          {
+           "front": "🦇",
+           "back": "bat"
+          },
+          {
+           "front": "🕷️",
+           "back": "spider"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "a1",
+     "title": "A1 — Halloween Night 🌙",
+     "lessons": [
+      {
+       "id": "a1-l1",
+       "title": "Spooky Stories for Beginners",
+       "page": 1,
+       "tasks": [
+        {
+         "id": "a11",
+         "type": "multiple-choice",
+         "title": "Costume time",
+         "instruction": "Choose the correct answer.",
+         "options": [
+          "put on",
+          "look after",
+          "get up",
+          "wake up"
+         ],
+         "answerIndex": 0,
+         "explanation": "At Halloween children PUT ON their costumes. 🧛"
+        },
+        {
+         "id": "a12",
+         "type": "gap-fill",
+         "title": "The haunted house",
+         "instruction": "Fill in the gaps.",
+         "text": "Tom ___ into the old house. It is very ___. Suddenly he ___ a ghost! The ghost says: \"___ or treat!\"",
+         "blanks": [
+          {
+           "answers": [
+            "goes",
+            "walks"
+           ],
+           "hint": "moves with his legs"
+          },
+          {
+           "answers": [
+            "dark",
+            "black"
+           ],
+           "hint": "no light"
+          },
+          {
+           "answers": [
+            "sees",
+            "meets"
+           ],
+           "hint": "looks at and notices"
+          },
+          {
+           "answers": [
+            "Trick",
+            "trick"
+           ],
+           "hint": "the famous Halloween word"
+          }
+         ],
+         "explanation": "Tom goes into the old house. It is very dark. Suddenly he sees a ghost! The ghost says: \"Trick or treat!\""
+        },
+        {
+         "id": "a13",
+         "type": "word-order",
+         "title": "Build the sentence",
+         "instruction": "Put the words in the correct order.",
+         "words": [
+          "like",
+          "I",
+          "Halloween",
+          "!"
+         ],
+         "answer": "I like Halloween !",
+         "explanation": "I like Halloween!"
+        },
+        {
+         "id": "a14",
+         "type": "true-false",
+         "title": "Halloween facts",
+         "instruction": "True or false?",
+         "text": "Halloween is celebrated on the 31st of October.",
+         "answer": true,
+         "explanation": "Yes! Halloween night is on October 31."
+        },
+        {
+         "id": "a15",
+         "type": "matching",
+         "title": "Things and places",
+         "instruction": "Match the things to where you find them at Halloween.",
+         "pairs": [
+          {
+           "left": "pumpkin",
+           "right": "the garden"
+          },
+          {
+           "left": "candles",
+           "right": "the window"
+          },
+          {
+           "left": "costume",
+           "right": "the wardrobe"
+          },
+          {
+           "left": "candy",
+           "right": "a big bag"
+          }
+         ]
+        },
+        {
+         "id": "a16",
+         "type": "word-search",
+         "title": "Party words",
+         "instruction": "Find five Halloween words.",
+         "words": [
+          "MASK",
+          "PARTY",
+          "CANDY",
+          "GHOST",
+          "WITCH"
+         ],
+         "grid": [
+          "JNGIFHYJZW",
+          "RMHTDZKYWJ",
+          "QEOQJUXLIT",
+          "VRSWTHPATM",
+          "FKTMTATOCE",
+          "UUHCPOMBHF",
+          "QIWAARAOSY",
+          "TYKNRQSVOA",
+          "OEDDTMKLOY",
+          "JWIYYVZPAY"
+         ]
+        },
+        {
+         "id": "a17",
+         "type": "short-answer",
+         "title": "Answer the question",
+         "instruction": "Write a short answer.",
+         "question": "What do children wear on Halloween night?",
+         "answers": [
+          "costume",
+          "costumes",
+          "a costume"
+         ],
+         "model": "Children wear funny or scary costumes."
+        },
+        {
+         "id": "a18",
+         "type": "dictation",
+         "title": "Listen and write",
+         "instruction": "Listen (🔊) and type exactly what you hear.",
+         "text": "The spooky spider is under the bed."
+        },
+        {
+         "id": "a19",
+         "type": "categorize",
+         "title": "Sort the words",
+         "instruction": "Put the words into two groups.",
+         "categories": [
+          {
+           "name": "🧙 Scary things",
+           "items": [
+            "ghost",
+            "witch",
+            "spider",
+            "haunted house"
+           ]
+          },
+          {
+           "name": "🍭 Sweet things",
+           "items": [
+            "candy",
+            "chocolate",
+            "apple",
+            "cake"
+           ]
+          }
+         ]
+        },
+        {
+         "id": "a110",
+         "type": "initials",
+         "title": "Words from letters",
+         "instruction": "Complete the words using the first letter.",
+         "items": [
+          {
+           "initial": "P",
+           "word": "pumpkin"
+          },
+          {
+           "initial": "B",
+           "word": "bat"
+          },
+          {
+           "initial": "O",
+           "word": "owl"
+          },
+          {
+           "initial": "C",
+           "word": "candle"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "a2",
+     "title": "A2 — Monster Party 🧟",
+     "lessons": [
+      {
+       "id": "a2-l1",
+       "title": "Tales of the Haunted Town",
+       "page": 1,
+       "tasks": [
+        {
+         "id": "a21",
+         "type": "reading-truefalse",
+         "title": "Read and judge",
+         "instruction": "Read the text, then decide TRUE or FALSE.",
+         "passage": "Every year on October 31 people in many countries celebrate Halloween. Children wear scary costumes and go trick-or-treating in the streets. Families carve jack-o'-lanterns from pumpkins and put candles inside them. People also tell ghost stories and visit haunted houses. Halloween always falls on the same date, so nobody needs to remember a new day each year.",
+         "statements": [
+          {
+           "text": "Halloween is celebrated in autumn.",
+           "answer": true
+          },
+          {
+           "text": "Adults go trick-or-treating alone.",
+           "answer": false
+          },
+          {
+           "text": "Jack-o'-lanterns are made from pumpkins.",
+           "answer": true
+          },
+          {
+           "text": "The date of Halloween changes every year.",
+           "answer": false
+          }
+         ]
+        },
+        {
+         "id": "a22",
+         "type": "multiple-select",
+         "title": "Scary monsters",
+         "instruction": "Choose ALL the Halloween monsters.",
+         "options": [
+          {
+           "text": "vampire",
+           "correct": true
+          },
+          {
+           "text": "zombie",
+           "correct": true
+          },
+          {
+           "text": "dolphin",
+           "correct": false
+          },
+          {
+           "text": "mummy",
+           "correct": true
+          },
+          {
+           "text": "parrot",
+           "correct": false
+          }
+         ]
+        },
+        {
+         "id": "a23",
+         "type": "error-correction",
+         "title": "Spot the mistake",
+         "instruction": "Click the wrong word and fix it.",
+         "sentence": "Yesterday we went to a scare fair and I buyed a mask.",
+         "wrongIndex": 6,
+         "fix": "bought",
+         "explanation": "Past simple of 'buy' is 'bought'. Also: 'scary fair', but here the verb was the target."
+        },
+        {
+         "id": "a24",
+         "type": "gap-fill",
+         "title": "Ghost story",
+         "instruction": "Complete the story with the correct forms.",
+         "text": "Last night, while I ___ (walk) home, I ___ (hear) a strange noise behind me. My heart ___ (beat) very fast!",
+         "blanks": [
+          {
+           "answers": [
+            "was walking"
+           ],
+           "hint": "past continuous"
+          },
+          {
+           "answers": [
+            "heard"
+           ],
+           "hint": "past simple of 'hear'"
+          },
+          {
+           "answers": [
+            "was beating",
+            "beat"
+           ],
+           "hint": "long action in the past"
+          }
+         ],
+         "explanation": "was walking / heard / was beating"
+        },
+        {
+         "id": "a25",
+         "type": "definition-match",
+         "title": "Definitions",
+         "instruction": "Match the word to its definition.",
+         "pairs": [
+          {
+           "front": "haunted house",
+           "back": "a house where ghosts appear"
+          },
+          {
+           "front": "trick-or-treat",
+           "back": "children ask for sweets door to door"
+          },
+          {
+           "front": "costume",
+           "back": "special clothes you wear for fun"
+          },
+          {
+           "front": "jack-o'-lantern",
+           "back": "a carved pumpkin with a candle"
+          }
+         ]
+        },
+        {
+         "id": "a26",
+         "type": "reorder-text",
+         "title": "Story order",
+         "instruction": "Click the sentences in the correct order.",
+         "lines": [
+          "Mum switched off all the lights.",
+          "We hid behind the sofa with out masks on.",
+          "Grandpa opened the door and saw two 'monsters'.",
+          "Everybody laughed and ate cake."
+         ],
+         "explanation": "First the lights, then hiding, then grandpa opens the door, finally everyone laughs."
+        },
+        {
+         "id": "a27",
+         "type": "crosswords",
+         "title": "Mini crossword",
+         "instruction": "Solve the crossword.",
+         "cells": [
+          {
+           "x": 0,
+           "y": 0,
+           "letter": "S"
+          },
+          {
+           "x": 1,
+           "y": 0,
+           "letter": "P"
+          },
+          {
+           "x": 2,
+           "y": 0,
+           "letter": "I"
+          },
+          {
+           "x": 3,
+           "y": 0,
+           "letter": "D"
+          },
+          {
+           "x": 4,
+           "y": 0,
+           "letter": "E"
+          },
+          {
+           "x": 5,
+           "y": 0,
+           "letter": "R"
+          }
+         ],
+         "clues": [
+          {
+           "word": "SPIDER",
+           "clue": "An animal with eight legs",
+           "dir": "across"
+          }
+         ]
+        },
+        {
+         "id": "a28",
+         "type": "word-search",
+         "title": "In the haunted forest",
+         "instruction": "Find six words.",
+         "words": [
+          "FOREST",
+          "GRAVE",
+          "MOON",
+          "SHADOW",
+          "CAULDRON",
+          "BROOM"
+         ],
+         "grid": [
+          "CEWNXXGDFTWH",
+          "SLPMXBOLHYGB",
+          "ZQPLEEGNAJRV",
+          "QMHCBJFVYHAO",
+          "QWVTRMTOCGVV",
+          "FLEBOUCLRZET",
+          "USRTOTBJMEZM",
+          "FHJAMQAXWOSU",
+          "OAUNLSFRVHOT",
+          "IDCAULDRONQN",
+          "XOGSPYAPXENC",
+          "XWVRSSOVMGVP"
+         ]
+        },
+        {
+         "id": "a29",
+         "type": "sentence-transform",
+         "title": "Rewrite it",
+         "instruction": "Rewrite the sentence in the past simple.",
+         "source": "We carve a pumpkin every October.",
+         "task": "Start with: Yesterday...",
+         "answers": [
+          "we carved a pumpkin last october",
+          "yesterday we carved a pumpkin",
+          "we carved a pumpkin yesterday"
+         ],
+         "explanation": "carve → carved; 'every October' → 'yesterday/last October'."
+        },
+        {
+         "id": "a210",
+         "type": "listen-gap",
+         "title": "Watch and fill",
+         "instruction": "Listen (🔊) and fill in the missing words.",
+         "text": "Happy Halloween! Watch a scary film and eat some ___, but don't forget: ___ or treat!",
+         "blanks": [
+          {
+           "answers": [
+            "popcorn",
+            "sweets",
+            "candy"
+           ]
+          },
+          {
+           "answers": [
+            "trick"
+           ]
+          }
+         ],
+         "explanation": "...eat some popcorn, but don't forget: trick or treat!"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "b1",
+     "title": "B1 — Legends & Lore 📜",
+     "lessons": [
+      {
+       "id": "b1-l1",
+       "title": "From Samhain to Supermarkets",
+       "page": 1,
+       "tasks": [
+        {
+         "id": "b11",
+         "type": "reading-truefalse",
+         "title": "The history of Halloween",
+         "instruction": "Read and judge the statements.",
+         "passage": "Halloween grew out of the ancient Celtic festival of Samhain, which marked the end of the harvest season and the beginning of winter. The Celts believed that on the night of October 31 the boundary between the living and the dead became blurred, so they lit huge bonfires and wore animal skins to confuse restless spirits. When Irish immigrants brought the tradition to America in the 19th century, cheap and plentiful pumpkins replaced turnips as lanterns. 'Trick-or-treating' developed later, partly from the medieval practice of 'guising', where people performed small tricks in exchange for food. Today Halloween is a multi-billion-dollar holiday, yet its central idea remains the same: one night a year when people enjoy being frightened.",
+         "statements": [
+          {
+           "text": "Samhain celebrated the start of the harvest.",
+           "answer": false
+          },
+          {
+           "text": "The Celts thought spirits could walk the earth on that night.",
+           "answer": true
+          },
+          {
+           "text": "Pumpkins were used as lanterns before turnips in Ireland.",
+           "answer": false
+          },
+          {
+           "text": "Trick-or-treating has links to medieval customs.",
+           "answer": true
+          },
+          {
+           "text": "Modern Halloween has lost its original idea completely.",
+           "answer": false
+          }
+         ]
+        },
+        {
+         "id": "b12",
+         "type": "multiple-select",
+         "title": "Superstitions",
+         "instruction": "Select all typical Halloween superstitions.",
+         "options": [
+          {
+           "text": "If you meet a black cat, your luck may change",
+           "correct": true
+          },
+          {
+           "text": "Peeling an apple in one long strip shows your future partner's initial",
+           "correct": true
+          },
+          {
+           "text": "You must sleep with a mirror under your pillow",
+           "correct": false
+          },
+          {
+           "text": "Seeing a spider on Halloween night means a loved one is watching over you",
+           "correct": true
+          },
+          {
+           "text": "Counting stars makes wishes come true only in December",
+           "correct": false
+          }
+         ]
+        },
+        {
+         "id": "b13",
+         "type": "error-correction",
+         "title": "Grammar doctor",
+         "instruction": "Find and fix the mistake.",
+         "sentence": "If I were a bat, I would flew every night.",
+         "wrongIndex": 7,
+         "fix": "fly",
+         "explanation": "After 'would' we use the bare infinitive: would fly."
+        },
+        {
+         "id": "b14",
+         "type": "gap-fill",
+         "title": "Collocations",
+         "instruction": "Complete with the right preposition or noun.",
+         "text": "The ghost story sent ___ shivers ___ my spine. Legend has ___ that the castle is haunted ___ centuries.",
+         "blanks": [
+          {
+           "answers": [
+            "down"
+           ],
+           "hint": "shivers travel this way"
+          },
+          {
+           "answers": [
+            "of",
+            "down"
+           ],
+           "hint": "...shivers ___ my spine"
+          },
+          {
+           "answers": [
+            "it"
+           ],
+           "hint": "legend has ___"
+          },
+          {
+           "answers": [
+            "for",
+            "since"
+           ],
+           "hint": "present perfect time marker"
+          }
+         ],
+         "explanation": "sent down shivers down my spine / legend has it / haunted for centuries"
+        },
+        {
+         "id": "b15",
+         "type": "definition-match",
+         "title": "Advanced vocabulary",
+         "instruction": "Match the word to its meaning.",
+         "pairs": [
+          {
+           "front": "restless spirits",
+           "back": "souls that cannot find peace"
+          },
+          {
+           "front": "blurred boundary",
+           "back": "an unclear dividing line"
+          },
+          {
+           "front": "bonfire",
+           "back": "a large outdoor fire"
+          },
+          {
+           "front": "guising",
+           "back": "disguised performers asking for treats"
+          },
+          {
+           "front": "harvest",
+           "back": "the season of gathering crops"
+          }
+         ]
+        },
+        {
+         "id": "b16",
+         "type": "word-order",
+         "title": "Complex sentence",
+         "instruction": "Unjumble the reported speech.",
+         "words": [
+          "said",
+          "She",
+          "she",
+          "had",
+          "seen",
+          "a",
+          "ghost",
+          "."
+         ],
+         "answer": "She said she had seen a ghost .",
+         "explanation": "Reported speech: She said (that) she had seen a ghost."
+        },
+        {
+         "id": "b17",
+         "type": "reorder-text",
+         "title": "Plot of the short story",
+         "instruction": "Order the events of the story.",
+         "lines": [
+          "Elena moved into the old Victorian house.",
+          "Objects started moving on their own.",
+          "She found a hidden diary in the wall.",
+          "The diary explained the maid's tragic death.",
+          "Elena held a small ceremony and the house fell silent."
+         ],
+         "explanation": "Setup → problem → discovery → revelation → resolution."
+        },
+        {
+         "id": "b18",
+         "type": "short-answer",
+         "title": "Open question",
+         "instruction": "Answer in 1–2 full sentences.",
+         "question": "Why do you think people enjoy being scared on Halloween?",
+         "answers": [
+          "adrenaline",
+          "safe way to feel fear",
+          "excitement",
+          "because it is fun to feel fear safely",
+          "thrill"
+         ],
+         "model": "Because it gives an adrenaline rush in a safe situation — you can enjoy fear without real danger."
+        },
+        {
+         "id": "b19",
+         "type": "crosswords",
+         "title": "Vocabulary crossword",
+         "instruction": "Solve the crossword.",
+         "cells": [
+          {
+           "x": 0,
+           "y": 0,
+           "letter": "S"
+          },
+          {
+           "x": 1,
+           "y": 0,
+           "letter": "A"
+          },
+          {
+           "x": 2,
+           "y": 0,
+           "letter": "M"
+          },
+          {
+           "x": 3,
+           "y": 0,
+           "letter": "H"
+          },
+          {
+           "x": 4,
+           "y": 0,
+           "letter": "A"
+          },
+          {
+           "x": 5,
+           "y": 0,
+           "letter": "I"
+          },
+          {
+           "x": 6,
+           "y": 0,
+           "letter": "N"
+          },
+          {
+           "x": 1,
+           "y": 1,
+           "letter": "A"
+          },
+          {
+           "x": 1,
+           "y": 2,
+           "letter": "U"
+          },
+          {
+           "x": 1,
+           "y": 3,
+           "letter": "L"
+          },
+          {
+           "x": 1,
+           "y": 4,
+           "letter": "D"
+          },
+          {
+           "x": 1,
+           "y": 5,
+           "letter": "R"
+          },
+          {
+           "x": 1,
+           "y": 6,
+           "letter": "O"
+          },
+          {
+           "x": 1,
+           "y": 7,
+           "letter": "N"
+          }
+         ],
+         "clues": [
+          {
+           "word": "SAMHAIN",
+           "clue": "Ancient Celtic festival Halloween came from",
+           "dir": "across"
+          },
+          {
+           "word": "CAULDRON",
+           "clue": "Big pot witches stir",
+           "dir": "down"
+          }
+         ]
+        },
+        {
+         "id": "b110",
+         "type": "timeline",
+         "title": "Chronology",
+         "instruction": "Place the events in chronological order.",
+         "events": [
+          {
+           "label": "Celtic festival of Samhain",
+           "date": "around 2000 years ago"
+          },
+          {
+           "label": "All Saints' Day named by the Church",
+           "date": "609 AD onward"
+          },
+          {
+           "label": "Irish immigrants bring traditions to America",
+           "date": "1840s"
+          },
+          {
+           "label": "Mass-produced Halloween cards and costumes",
+           "date": "1900s"
+          },
+          {
+           "label": "Multi-billion-dollar modern holiday",
+           "date": "today"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "b2",
+     "title": "B2 — The Psychology of Fear 🧠",
+     "lessons": [
+      {
+       "id": "b2-l1",
+       "title": "Why We Love Being Scared",
+       "page": 1,
+       "tasks": [
+        {
+         "id": "b21",
+         "type": "reading-truefalse",
+         "title": "The economics of fear",
+         "instruction": "Read and judge.",
+         "passage": "Psychologists distinguish 'recreational fear' — horror experiences sought out voluntarily — from trauma, which is imposed. Studies of haunted-house visitors show that excitable personalities report greater enjoyment, suggesting the pleasure comes less from the stimulus itself than from the sense of mastery: surviving the scare confirms our competence. Economists add another layer. Fear-inducing entertainment generates outsized revenue precisely because its physiological arousal — elevated heart rate, dopamine release — is shared socially; co-regulation turns individual alarm into group bonding. Critics counter that commercialised horror flattens the folkloric function of Halloween, which historically processed collective anxieties about death and the changing seasons through ritual rather than profit.",
+         "statements": [
+          {
+           "text": "Recreational fear is chosen freely by the experiencer.",
+           "answer": true
+          },
+          {
+           "text": "Research links enjoyment purely to the intensity of the scare.",
+           "answer": false
+          },
+          {
+           "text": "Shared physiological arousal can strengthen social bonds.",
+           "answer": true
+          },
+          {
+           "text": "Critics argue commercial horror preserves folklore's function.",
+           "answer": false
+          }
+         ]
+        },
+        {
+         "id": "b22",
+         "type": "multiple-select",
+         "title": "Lexical precision",
+         "instruction": "Select every sentence using the word correctly.",
+         "options": [
+          {
+           "text": "The plot was predictable, but the cinematography was superb.",
+           "correct": true
+          },
+          {
+           "text": "His fear of spiders is a rational phobia.",
+           "correct": false
+          },
+          {
+           "text": "The film relies on atmosphere rather than gore.",
+           "correct": true
+          },
+          {
+           "text": "She made a jump scare out of nowhere.",
+           "correct": false
+          },
+          {
+           "text": "The ending left more questions than it answered.",
+           "correct": true
+          }
+         ]
+        },
+        {
+         "id": "b23",
+         "type": "error-correction",
+         "title": "Style editor",
+         "instruction": "Click the unnatural/incorrect word and fix it.",
+         "sentence": "Hardly had we entered the cellar than we heard a scream.",
+         "wrongIndex": 6,
+         "fix": "when",
+         "explanation": "'Hardly ... when' (not 'than'). 'No sooner ... than' uses 'than'."
+        },
+        {
+         "id": "b24",
+         "type": "sentence-transform",
+         "title": "Inversion",
+         "instruction": "Rewrite starting with the word in brackets.",
+         "source": "We had barely entered the cellar when we heard a scream.",
+         "task": "Begin with: Hardly ...",
+         "answers": [
+          "hardly had we entered the cellar when we heard a scream"
+         ],
+         "explanation": "Hardly had + subject + past participle ... when + past simple."
+        },
+        {
+         "id": "b25",
+         "type": "gap-fill",
+         "title": "Idioms",
+         "instruction": "Complete the idioms.",
+         "text": "When the torch flickered, my blood ran ___. I decided to play it ___ and stayed outside. Honestly, the whole thing was a complete red ___.",
+         "blanks": [
+          {
+           "answers": [
+            "cold"
+           ],
+           "hint": "my blood ran ___"
+          },
+          {
+           "answers": [
+            "safe"
+           ],
+           "hint": "play it ___"
+          },
+          {
+           "answers": [
+            "herring"
+           ],
+           "hint": "a misleading clue: red ___"
+          }
+         ],
+         "explanation": "blood ran cold / play it safe / red herring"
+        },
+        {
+         "id": "b26",
+         "type": "definition-match",
+         "title": "Literary terms",
+         "instruction": "Match term to definition.",
+         "pairs": [
+          {
+           "front": "unreliable narrator",
+           "back": "a storyteller whose credibility is compromised"
+          },
+          {
+           "front": "foreshadowing",
+           "back": "early hints of later events"
+          },
+          {
+           "front": "red herring",
+           "back": "a false clue diverting attention"
+          },
+          {
+           "front": "denouement",
+           "back": "the final resolution of the plot"
+          },
+          {
+           "front": "gothic",
+           "back": "mood of decay, mystery and dread"
+          }
+         ]
+        },
+        {
+         "id": "b27",
+         "type": "reorder-text",
+         "title": "Narrative arc",
+         "instruction": "Arrange the paragraphs of the micro-story.",
+         "lines": [
+          "The invitation arrived without a signature.",
+          "Curious despite myself, I accepted.",
+          "At midnight the host proposed a game of hide-and-seek.",
+          "I hid in the library and heard my own name whispered.",
+          "The next morning I found my handwriting in the guestbook — dated 1924."
+         ],
+         "explanation": "Classic ghost-story arc: hook → decision → event → climax → twist."
+        },
+        {
+         "id": "b28",
+         "type": "short-answer",
+         "title": "Discussion",
+         "instruction": "Give a considered answer (2–3 sentences).",
+         "question": "Is it ethical to market extreme horror to teenagers? Justify your view.",
+         "answers": [
+          "age rating",
+          "consent",
+          "vulnerable",
+          "desensitis",
+          "desensitiz",
+          "parental",
+          "freedom of choice"
+         ],
+         "model": "Arguably no: adolescents are still developing risk assessment, so marketing designed to exploit arousal bypasses informed consent — age ratings and parental gates help."
+        },
+        {
+         "id": "b29",
+         "type": "crosswords",
+         "title": "Advanced crossword",
+         "instruction": "Solve the crossword.",
+         "cells": [
+          {
+           "x": 0,
+           "y": 0,
+           "letter": "A"
+          },
+          {
+           "x": 1,
+           "y": 0,
+           "letter": "R"
+          },
+          {
+           "x": 2,
+           "y": 0,
+           "letter": "O"
+          },
+          {
+           "x": 3,
+           "y": 0,
+           "letter": "U"
+          },
+          {
+           "x": 4,
+           "y": 0,
+           "letter": "S"
+          },
+          {
+           "x": 5,
+           "y": 0,
+           "letter": "A"
+          },
+          {
+           "x": 6,
+           "y": 0,
+           "letter": "L"
+          }
+         ],
+         "clues": [
+          {
+           "word": "AROUSAL",
+           "clue": "Physiological excitement of fear response",
+           "dir": "across"
+          }
+         ]
+        },
+        {
+         "id": "b210",
+         "type": "word-search",
+         "title": "Roots of fear",
+         "instruction": "Find seven advanced words.",
+         "words": [
+          "AROUSAL",
+          "PHOBIA",
+          "MACABRE",
+          "DREAD",
+          "UNEASY",
+          "SPIRIT",
+          "LORE"
+         ],
+         "grid": [
+          "SREBSJRLMDJL",
+          "ZPZZOZZBAOYC",
+          "TUIOPXPTCLSS",
+          "CRKRLPHEASOL",
+          "IOFOIOOEBEDD",
+          "PUIPFTBXRSOR",
+          "UCEDIZIXEUSE",
+          "TGAILFAELNMA",
+          "CAROUSALOETD",
+          "AESINRXARAUV",
+          "FVXMSNIWESYW",
+          "MJPYKZSKNYBJ"
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "assets": {}
+}
