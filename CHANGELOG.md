@@ -4,6 +4,27 @@ All notable changes to IntExeBook are documented here. The app's in-app
 update dialog reads its change list from `app_version.json`
 (`changelogVersions`) — keep both files in sync when releasing.
 
+## [1.0.2] — 2026-10-26
+
+### Fixed
+- **Course editor no longer breaks.** Creating a new course (`#/create`)
+  showed a blank screen, and opening an existing textbook for editing crashed
+  with `Could not open this textbook for editing: Failed to execute
+  'appendChild' on 'Node': parameter 1 is not of type 'Node'`.
+  - The DOM helper `h()` now silently skips `null`/`undefined`/boolean
+    children instead of feeding them to `appendChild()`.
+  - The bridge to the main app (`window.IEB_APP`) is resolved lazily through
+    a proxy with DOM fallbacks, so a half-initialised or missing bridge can no
+    longer render the editor into `undefined` (the blank-screen cause).
+  - Every async editor entry point (`renderCreate`, `renderImport`,
+    `renderImportZip`, …) now catches its own errors and paints a readable
+    error box with a "← back to Textbooks" link, instead of leaving the user
+    on a silent empty page.
+
+### Changed
+- App version bumped to **1.0.2** (`package.json`, `package-lock.json`,
+  `app_version.json`, `web/index.html` — including the bottom-left badge).
+
 ## [1.0.1] — 2026-10-26
 
 ### Added

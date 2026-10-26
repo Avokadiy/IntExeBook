@@ -25,7 +25,21 @@
   if (!S) { console.error("shared.js is missing"); return; }
   /* helpers that live in app.js — classic scripts have separate scopes, so
      they are exported through the window.IEB_APP bridge (see end of app.js) */
-  const A = window.IEB_APP || {};
+  /* The bridge (window.IEB_APP, exported at the end of app.js) is captured
+     lazily through getters: if it is ever missing or half-initialised we
+     still resolve the real objects instead of silently rendering into
+     undefined — which used to show as a blank screen on #/create and the
+     "Failed to execute 'appendChild' ... parameter 1 is not of type 'Node'"
+     crash when opening a textbook for editing. */
+  const A = new Proxy(window.IEB_APP || {}, {
+    get(t, k) {
+      const src = window.IEB_APP || {};
+      if (k in src) return src[k];
+      if (k === "app") return document.getElementById("app");
+      if (k === "crumbsEl") return document.getElementById("crumbs");
+      return undefined;
+    },
+  });
   const app = A.app;
   const esc = A.esc;
   const API = A.API;
@@ -54,8 +68,13 @@
       else if (k === "checked") el.checked = !!v;
       else el.setAttribute(k, v);
     }
-    (Array.isArray(children) ? children : children === undefined || children === null ? [] : [children])
-      .forEach(c => el.appendChild(typeof c === "string" ? document.createTextNode(c) : c));
+    /* filter out null/undefined/false children: they used to reach
+       appendChild() and crash with "parameter 1 is not of type 'Node'" */
+    const kids = Array.isArray(children) ? children : (children == null ? [] : [children]);
+    kids.forEach(c => {
+      if (c === null || c === undefined || c === false || c === true) return;
+      el.appendChild(typeof c === "object" && c.nodeType ? c : document.createTextNode(String(c)));
+    });
     return el;
   }
   function input(value, onInput, attrs) {
@@ -168,7 +187,20 @@
   }
 
   /* ============================================================ #/create */
+  /* ---- safe render entry points -------------------------------------------------
+     The router (app.js) does NOT await these async views, so any rejection
+     used to leave the screen blank ("New course" -> empty page). Every entry
+     point below catches its own errors and paints a visible error box. */
+  function renderError(e) {
+    const host = window.IEB_APP ? window.IEB_APP.app : document.getElementById("app");
+    if (!host) return;
+    host.innerHTML = '<div class="error-box">⚠️ ' + esc(e && (e.message || String(e)) || "Unknown error") +
+      ' <a href="#/" style="color:inherit;text-decoration:underline">← back to Textbooks</a></div>';
+  }
+
   async function renderCreate() {
+    try {
+    if (!app) { throw new Error("The app container is missing — reload the page."); }
     renderCrumbs([{ label: "🏠 Textbooks", href: "#/" }, { label: "🛠 Create exercises" }]);
     app.innerHTML = `
       <section>
@@ -265,6 +297,7 @@
       ]);
       list.appendChild(row);
     });
+    } catch (e) { renderError(e); }
   }
 
   async function listAllDrafts() {
@@ -317,6 +350,7 @@
   }
   /* ============================================================ #/import */
   function renderImport() {
+    try {
     /* ---- admin hub flow (web/admin.js): open a published course straight
        into the editor instead of showing the file-drop page. The pack was
        fetched by the panel and parked on window.__iebAdminPack; the hub
@@ -363,6 +397,7 @@
       if (e.dataTransfer.files[0]) handlePackFile(e.dataTransfer.files[0]);
     });
     fi.onchange = () => fi.files[0] && handlePackFile(fi.files[0]);
+    } catch (e) { renderError(e); }
   }
 
   function handlePackFile(file) {
@@ -439,7 +474,8 @@
      exactly what the player expects.  Binary files go to the server as raw
      bytes (no base64), so archives up to ~500 MB import fine. */
   function renderImportZip() {
-    renderCrumbs([{ label: "🏠 Textbooks", href: "#/" }, { label: "📚 Import textbook (.zip)" }]);
+    try {
+    renderCrumbs([{ label: "🏠 Textbooks", href: "#/" }, { label: "📚 Import textbook (.zip)"} ]);
     app.innerHTML = `
       <section>
         <h2 class="step-title"><span class="stepnum">⇪</span> Import a textbook from a ZIP archive</h2>
@@ -474,6 +510,7 @@
       if (e.dataTransfer.files[0]) importZipFile(e.dataTransfer.files[0]);
     });
     fi.onchange = () => fi.files[0] && importZipFile(fi.files[0]);
+    } catch (e) { renderError(e); }
   }
 
   async function importZipFile(file) {
