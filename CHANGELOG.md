@@ -4,6 +4,30 @@ All notable changes to IntExeBook are documented here. The app's in-app
 update dialog reads its change list from `app_version.json`
 (`changelogVersions`) — keep both files in sync when releasing.
 
+## [1.0.3] — 2026-10-26
+
+### Fixed
+- **True/False tasks now unlock the Next button on selection.** Picking
+  TRUE or FALSE in `true-false` and `reading-truefalse` tasks previously left
+  "Next →" disabled until Check was pressed; the engines (`engineTF`,
+  `engineReadingTF`) now mark progress as soon as an answer is selected, so a
+  student can move on immediately after choosing.
+- **Halloween course: missing pictures/icons.** The `click-on-picture` task
+  shipped with an empty `image` field, which rendered a broken/blank picture.
+  - `enginePicture()` now generates a themed Halloween SVG scene (with the
+    hotspot labels placed at their declared coordinates) whenever a task has
+    no usable image file, and swaps it in via `onerror` if a referenced file
+    fails to load.
+  - `anyMedia("image")` also recognises a task's direct `image` property, so
+    engines that render media (short-answer, video-quiz, …) show the picture.
+  - `listen-choice` without an attached audio clip now speaks the answer
+    options aloud (🔊 Read the options aloud) instead of only repeating the
+    instruction.
+
+### Changed
+- App version bumped to **1.0.3** (`package.json`, `app_version.json`,
+  `web/index.html` — including the bottom-left badge).
+
 ## [1.0.2] — 2026-10-26
 
 ### Fixed

@@ -1,7 +1,7 @@
 {
   "name": "intexebook",
   "productName": "IntExeBook",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Interactive tasks for English teachers — runs 100% locally, no internet needed.",
   "main": "desktop/main.js",
   "author": "IntExeBook",

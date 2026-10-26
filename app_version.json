@@ -1,7 +1,11 @@
 {
-  "version": "1.0.2",
+  "version": "1.0.3",
   "date": "2026-10-26",
   "changelogVersions": {
+    "1.0.3": [
+      "True/False tasks: the Next button now lights up as soon as an answer is selected (both plain true-false and reading true/false), even before pressing Check.",
+      "Halloween course fixes in the player: click-on-picture tasks without an image file now render a generated Halloween scene with the hotspots instead of a broken picture; tasks with a direct image source show it via the media pipeline; listen-choice speaks the options aloud when no audio clip is attached."
+    ],
     "1.0.2": [
       "Fixed the course editor: creating a new course no longer shows a blank screen, and opening an existing textbook for editing no longer crashes with \"Failed to execute 'appendChild' on 'Node': parameter 1 is not of type 'Node'\".",
       "Editor render errors are now caught and shown as a readable error box with a link back, instead of a silent empty page."

@@ -829,7 +829,12 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
       return src;
     }
     function anyMedia(kind) {
-      return (task.media || []).find(m => m && m.type === kind) || null;
+      const m = (task.media || []).find(mm => mm && mm.type === kind) || null;
+      if (m) return m;
+      // a task may also carry a direct image source (e.g. click-on-picture);
+      // treat it as media so pictures show up in every engine that asks for one
+      if (kind === "image" && task.image) return { type: "image", src: task.image, caption: task.title || "" };
+      return null;
     }
     function mediaPlayerHtml(m, extraLabel) {
       if (!m) return "";
@@ -841,8 +846,8 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
           : `<img loading="lazy" src="${src}" alt="${esc(m.caption || "")}" style="max-width:100%;border-radius:12px">`;
       return `<div class="ex-media">${tag}${extraLabel ? `<div class="explain">${esc(extraLabel)}</div>` : ""}</div>`;
     }
-    function ttsBtn(text) {
-      return `<button class="opt-btn tiny tts-btn" type="button">\u{1F50A} Listen (speech)</button>` +
+    function ttsBtn(text, label) {
+      return `<button class="opt-btn tiny tts-btn" type="button">\u{1F50A} ${esc(label || "Listen (speech)")}</button>` +
         `<div class="sr-only" data-tts="${esc(text)}"></div>`;
     }
     function wireTts(root) {
@@ -1164,13 +1169,35 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
     /* click on picture — hotspot finder.  In the authoring preview (ctx.edit)
        the engine only draws the picture + a placeholder; the editor overlays
        its own numbered, draggable-free placement dots. */
+    function picFallbackSvg(task) {
+      // Halloween course ships emoji "pictures" instead of image files: when a
+      // click-on-picture task has no (or a broken) image, render a generated
+      // SVG scene with the hotspot labels so the task stays playable.
+      const spots = (task.hotspots || []);
+      const W = 600, H = 400;
+      let inner = `<defs><linearGradient id="pfbg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2b1b4d"/><stop offset="1" stop-color="#120a24"/>
+        </linearGradient></defs>
+        <rect width="${W}" height="${H}" fill="url(#pfbg)"/>
+        <circle cx="${W - 90}" cy="70" r="42" fill="#f5e6b8" opacity=".9"/>
+        <text x="30" y="60" font-size="44" opacity=".85">\u{1F383}</text>
+        <text x="${W / 2}" y="80" font-size="30" text-anchor="middle" fill="#cbb8ff" font-family="serif">\u{1F47B} \u{1F578}\uFE0F \u{1F987}</text>`;
+      spots.forEach(s => {
+        const cx = Math.max(30, Math.min(W - 30, (Number(s.x) || 50) / 100 * W));
+        const cy = Math.max(30, Math.min(H - 30, (Number(s.y) || 50) / 100 * H));
+        inner += `<text x="${cx}" y="${cy + 14}" font-size="46" text-anchor="middle">${esc(s.label || "")}</text>`;
+      });
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">${inner}</svg>`;
+      return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
+    }
     function enginePicture() {
-      const imgSrc = ctx.tbId != null && typeof mediaSrc === "function" ? mediaSrc(ctx.tbId, task.image || "") : (task.image || "");
+      const rawSrc = ctx.tbId != null && typeof mediaSrc === "function" ? mediaSrc(ctx.tbId, task.image || "") : (task.image || "");
+      const imgSrc = rawSrc || picFallbackSvg(task);
       if (ctx.edit) {
         body.innerHTML = `
           <div class="pic-wrap ed-pic-edit">
             <img class="pic-target" src="${esc(imgSrc)}" alt="" draggable="false">
-            ${imgSrc ? "" : `<div class="ed-pic-missing">No picture yet — upload one in the ✍ Content tab.</div>`}
+            ${rawSrc ? "" : `<div class="ed-pic-missing">No picture yet — upload one in the ✍ Content tab.</div>`}
           </div>`;
         return;
       }
@@ -1181,6 +1208,9 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
         </div>
         <div class="odd-status" id="picStatus">Click on: <b>${spots.map(s => esc(s.label)).join(", ")}</b></div>`;
       const wrap = document.getElementById("picWrap");
+      // if even the fallback fails to load, swap in the generated scene
+      const targetImg = wrap.querySelector("img.pic-target");
+      if (targetImg) targetImg.onerror = () => { targetImg.onerror = null; targetImg.src = picFallbackSvg(task); };
       let wrongTries = 0, graded = false;
       spots.forEach(s => {
         const dot = document.createElement("button");
@@ -1358,7 +1388,12 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
     function engineListenChoice() {
       let locked = false;
       const m = anyMedia("audio");
-      body.innerHTML = (m ? mediaPlayerHtml(m) : "") + ttsBtn(task.instruction || "") + "<div class='lc-opts'></div>";
+      // Without a real audio clip, "listening" means hearing the answer
+      // options spoken aloud — otherwise the task is just reading MC and the
+      // 🔊 button would only repeat the instruction.
+      const speakText = task.text ||
+        (task.options || []).map((o, i) => `${String.fromCharCode(65 + i)}. ${o}`).join(". ");
+      body.innerHTML = (m ? mediaPlayerHtml(m) : "") + ttsBtn(speakText, "🔊 Read the options aloud") + "<div class='lc-opts'></div>";
       wireTts(body);
       const host = body.querySelector(".lc-opts");
       (task.options || []).forEach((opt, i) => {
@@ -1528,6 +1563,15 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
       body.appendChild(host);
       const picked = new Array(st.length).fill(null);
       let checked = false;
+      // selecting an answer unlocks Next immediately (mirrors engineTF), so the
+      // student can move on even before pressing Check.
+      const touchProgress = () => {
+        if (state.results[idx] === null || state.results[idx] === undefined) {
+          state.results[idx] = true;
+          drawDots();
+          if (btnNext) btnNext.disabled = false;
+        }
+      };
       st.forEach((s, si) => {
         const row = document.createElement("div");
         row.className = "rt-row";
@@ -1542,6 +1586,7 @@ async function viewPlayer(tbId, slot, unitId, lessonId, taskId) {
             picked[si] = val;
             row.querySelectorAll(".tf-btn").forEach(el => el.classList.remove("selected"));
             b.classList.add("selected");
+            touchProgress();
           };
           row.appendChild(b);
         });
