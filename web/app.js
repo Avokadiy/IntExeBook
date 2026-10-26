@@ -223,6 +223,9 @@ async function doSync(reconfigure) {
     const ok = !res.errors.length && (res.added.length + res.updated.length + res.merged.length > 0);
     toast("🔄 Sync finished\n" + bits.join("\n"), res.errors.length ? "bad" : (ok ? "ok" : "warn"));
     invalidateCachesAndRefresh();
+    /* courses are installed now — re-check the beacon so the red light goes
+       quiet as soon as nothing is pending anymore */
+    refreshSyncBeacon(true);
   } catch (e) {
     const msg = String(e && e.message || e);
     /* auth/config problems -> offer to change the token right away */
@@ -247,6 +250,44 @@ if (syncBtn) {
   syncBtn.addEventListener("contextmenu", (ev) => { ev.preventDefault(); doSync(true); });
   syncBtn.title = "Update shared exercises. Right-click → sync settings (change token, repo, branch).";
 }
+
+/* --------------------------------------------- blinking red update beacon
+   A small red light next to the "🔄 Update" button blinks whenever the
+   shared-exercises folder on GitHub contains a course that is new or has
+   changed since the last sync/publish performed on THIS machine.
+   Detection lives in web/shared.js (checkForNewCourses): it lists the hub
+   via one GitHub API call and compares each file's git SHA against the SHA
+   we recorded when we last installed or pushed that exact revision. The
+   result is cached for 5 minutes; checks run at startup, every 10 minutes,
+   on tab re-focus and right after a sync — silent failures keep the last
+   known state so the light never flickers off because of a hiccup. */
+const syncBeacon = document.getElementById("syncBeacon");
+let beaconBusy = false;
+async function refreshSyncBeacon(force) {
+  if (!syncBeacon || beaconBusy) return;
+  const SYNC = window.IEB_SYNC || (window.IEB_SHARED && window.IEB_SHARED.sync);
+  if (!SYNC || typeof SYNC.checkForNewCourses !== "function") return;
+  beaconBusy = true;
+  try {
+    const res = await SYNC.checkForNewCourses(!!force);
+    const n = (res && res.pending && res.pending.length) || 0;
+    if (n > 0) {
+      syncBeacon.hidden = false;
+      const names = res.pending.map(p => p.name.replace(/\.iebpack\.json$/i, "")).slice(0, 6).join(", ");
+      syncBeacon.title = "🔴 New or updated courses in the repository (" + n + "): " + names +
+                         "\nClick \"🔄 Update\" to download them.";
+    } else {
+      syncBeacon.hidden = true;
+      syncBeacon.removeAttribute("title");
+    }
+  } catch (e) { /* offline/auth trouble — leave the light as it is */ }
+  beaconBusy = false;
+}
+refreshSyncBeacon(false);                                  /* check on startup */
+setInterval(() => refreshSyncBeacon(false), 10 * 60 * 1000); /* …and every 10 min */
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) refreshSyncBeacon(false);            /* …and on tab focus */
+});
 
 /* ------------------------------------------------------------ helpers */
 async function loadBookMeta(tbId) {

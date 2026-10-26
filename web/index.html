@@ -27,7 +27,11 @@ try {
     <div id="searchResults" class="search-results hidden"></div>
   </div>
   <a href="#/create" id="teacherBtn" class="btn btn-teacher">🛠 Create exercises</a>
-  <button id="syncBtn" class="theme-toggle" type="button" title="Update shared exercises from GitHub (🔄 Sync)">🔄 Update</button>
+  <span class="sync-wrap" id="syncWrap">
+    <button id="syncBtn" class="theme-toggle" type="button" title="Update shared exercises from GitHub (🔄 Sync)">🔄 Update</button>
+    <!-- blinking red beacon: lights up when the repo holds new/changed courses -->
+    <span id="syncBeacon" class="sync-beacon" hidden aria-label="New or updated courses available in the shared repository"></span>
+  </span>
   <button id="themeToggle" class="theme-toggle" type="button" title="Switch theme" aria-label="Switch theme">🌙</button>
 </header>
 

@@ -9,7 +9,7 @@ plus several zero-knowledge launch options (see below).
 
 | Option | What you do | Requires installed? |
 |---|---|---|
-| **A. Portable EXE (Windows)** | Double-click `IntExeBook-1.0.0.exe` (in `release/` after build, or shared via USB/cloud). A window opens. Done. | nothing |
+| **A. Portable EXE (Windows)** | Double-click `IntExeBook-1.0.1.exe` (in `release/` after build, or shared via USB/cloud). A window opens. Done. | nothing |
 | **B. `start.bat` / `start.sh`** | Double-click the launcher file next to this README. It automatically picks the best engine available: packaged app → Electron → Python server → plain browser mode. | nothing |
 | **C. Browser only** | Open `web/index.html` in Chrome/Edge/Firefox. Works without any server if your browser allows local file access; otherwise the page explains what to do. | nothing |
 

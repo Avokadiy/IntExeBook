@@ -134,6 +134,53 @@ function test(name, fn) {
     assert.ok(res.errors.some(e => /pkg-test-2/.test(e)), "error names the pack: " + res.errors);
   });
 
+  await test("beacon: unknown pack file -> pending (red light), known sha -> quiet", async () => {
+    Object.keys(store).forEach(k => delete store[k]);
+    const files = [{ name: "pkg-a.iebpack.json", path: "shared-exercises/pkg-a.iebpack.json", sha: "sha1" }];
+    fetchHandler = (url) => {
+      if (String(url).includes("/contents/shared-exercises")) return jsonResponse(files);
+      return jsonResponse({}, 404);
+    };
+    let res = await SYNC.checkForNewCourses(true);
+    assert.strictEqual(res.pending.length, 1, "a course we never synced is pending");
+    /* after syncPull installs/skips it the sha is recorded -> no more nagging */
+    SYNC.markSeen(files[0].path, files[0].sha);
+    res = await SYNC.checkForNewCourses(true);
+    assert.strictEqual(res.pending.length, 0, "seen revision must quiet the beacon");
+    /* and a changed git sha lights it up again */
+    fetchHandler = (url) => {
+      if (String(url).includes("/contents/shared-exercises")) {
+        return jsonResponse([{ name: files[0].name, path: files[0].path, sha: "sha2" }]);
+      }
+      return jsonResponse({}, 404);
+    };
+    res = await SYNC.checkForNewCourses(true);
+    assert.strictEqual(res.pending.length, 1, "an updated file must re-light the beacon");
+  });
+
+  await test("beacon: syncPull records seen shas so a forced re-check goes quiet", async () => {
+    Object.keys(store).forEach(k => delete store[k]);
+    global.location = { protocol: "http:", hostname: "localhost" };
+    const pack = { format: "ieb-pack", packageId: "pkg-beacon-1", revision: 1,
+                   fingerprint: "fp-b", manifest: { title: "Beacon Course" }, books: {} };
+    fetchHandler = (url) => {
+      const u = String(url);
+      if (u.includes("/contents/shared-exercises?")) {
+        return jsonResponse([{ name: "pkg-beacon-1.iebpack.json",
+                               path: "shared-exercises/pkg-beacon-1.iebpack.json", sha: "shaX" }]);
+      }
+      if (u.includes("raw.githubusercontent.com")) return jsonResponse(pack);
+      if (u === "/api/installed-packs") return jsonResponse({ packs: [] });
+      if (u === "/api/import") return jsonResponse({ action: "install", title: "Beacon Course" });
+      return jsonResponse({}, 404);
+    };
+    let res = await SYNC.checkForNewCourses(true);
+    assert.strictEqual(res.pending.length, 1, "new course glows before the first pull");
+    await SYNC.pull();
+    res = await SYNC.checkForNewCourses(true);
+    assert.strictEqual(res.pending.length, 0, "after pulling, nothing is pending anymore");
+  });
+
   process.exitCode = failures ? 1 : 0;
   console.log(failures ? failures + " test(s) failed" : "all tests passed");
 })();
