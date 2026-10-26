@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IntExeBook — Interactive tasks builder for English teachers</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>">
+<!-- relative paths work both on http://localhost (server mode) and when the
+     file is opened straight from disk via file:// (limited browser mode) -->
+<link rel="stylesheet" href="style.css">
+<script>
+/* apply the saved theme before first paint to avoid a light flash */
+try {
+  var t = localStorage.getItem("ieb-theme");
+  if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.dataset.theme = t;
+} catch (e) { /* private mode etc. — stay in light */ }
+</script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="#" id="brandHome">📖 IntExeBook</a>
+  <nav class="crumbs" id="crumbs"></nav>
+  <div class="search-wrap" id="searchWrap">
+    <input id="searchBox" type="search" autocomplete="off" spellcheck="false"
+           placeholder="Search textbooks, units, lessons, tasks…" aria-label="Search">
+    <div id="searchResults" class="search-results hidden"></div>
+  </div>
+  <a href="#/create" id="teacherBtn" class="btn btn-teacher">🛠 Create exercises</a>
+  <span class="sync-wrap">
+    <button id="syncBtn" class="theme-toggle" type="button" title="Update shared exercises from GitHub (🔄 Sync)">🔄 Update</button>
+    <!-- blinking red beacon: lights up when the hub has new/changed courses -->
+    <span id="syncBeacon" class="sync-beacon" hidden aria-hidden="true"></span>
+  </span>
+  <button id="themeToggle" class="theme-toggle" type="button" title="Switch theme" aria-label="Switch theme">🌙</button>
+</header>
+
+<main id="app" class="container">
+  <!-- Step 1: textbooks -->
+  <section id="step-textbooks">
+    <div class="hero">
+      <h1>Interactive tasks in seconds</h1>
+      <p>Pick a textbook, choose a lesson and turn any exercise into a live,
+         interactive activity your students can solve right in class.</p>
+    </div>
+    <h2 class="step-title"><span class="stepnum">1</span> Choose a textbook</h2>
+    <div class="grid" id="textbookGrid">
+      <div class="loading">Loading textbooks…</div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">IntExeBook · runs 100% locally · no internet needed</footer>
+<span class="app-version" id="appVersion" title="IntExeBook v1.0.2">v1.0.2</span>
+<!-- order matters: shared schema -> app (router + player engines) -> authoring editor -->
+<script src="textbooks-index.js"></script>
+<script>window.IEB_APP_VERSION = "1.0.2";</script>
+<script src="shared.js"></script>
+<script src="app.js"></script>
+<script src="update.js"></script>
+<script src="authoring.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "version": "1.0.2",
+  "date": "2026-10-26",
+  "changelogVersions": {
+    "1.0.2": [
+      "Fixed the course editor: creating a new course no longer shows a blank screen, and opening an existing textbook for editing no longer crashes with \"Failed to execute 'appendChild' on 'Node': parameter 1 is not of type 'Node'\".",
+      "Editor render errors are now caught and shown as a readable error box with a link back, instead of a silent empty page."
+    ],
+    "1.0.1": [
+      "Blinking red beacon on the \"🔄 Update\" button: it lights up whenever the hub holds new or changed courses since your last sync, and goes dark after you update (tooltip lists the pending courses).",
+      "Version bumped to 1.0.1."
+    ],
+    "1.0.0": [
+      "Initial public release of IntExeBook.",
+      "Authoring studio with 30 exercise types: audio, video, text, drag & drop, matching, quizzes and more.",
+      "Course hub: publish, edit and delete courses from the shared-hub git branch; one-click \"🔄 Update\" syncs every teacher's library (deletions propagate too).",
+      "Admin panel behind the Konami code for managing hub courses.",
+      "One-click in-app self-update: when a new release appears you get a dialog with the changes list and an \"Update now\" button — no manual file downloads.",
+      "The update button is only visible while a newer release actually exists."
+    ]
+  },
+  "download": {
+    "zip": "https://github.com/Avokadiy/IntExeBook/archive/refs/heads/shared-hub.zip"
+  }
+}

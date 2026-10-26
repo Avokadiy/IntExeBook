@@ -1,11 +1,11 @@
 {
  "format": "ieb-pack",
  "version": 1,
- "exported": "2026-10-26T12:44:26.000Z",
+ "exported": "2026-10-26T13:30:00.000Z",
  "generator": "IntExeBook",
  "packageId": "pkg-halloween2026001",
- "revision": 1,
- "fingerprint": "9380f7eb7a7bcfab",
+ "revision": 2,
+ "fingerprint": "df6fa6f4ea67b90a",
  "manifest": {
   "format": 1,
   "id": "halloween-special",
@@ -21,7 +21,7 @@
   "icon": "🎃",
   "student": "Student's Book",
   "created": "2026-10-26",
-  "fingerprint": "6a9aa646dbd41e73"
+  "fingerprint": "ac79c77b887ce31a"
  },
  "books": {
   "student": {
@@ -120,15 +120,15 @@
           "SPIDER"
          ],
          "grid": [
-          "QGXIBHGLK",
-          "LNTSPIDER",
-          "VGCATSHQF",
-          "EDBKBYZTY",
-          "WWPNFUCQM",
-          "GZRHYEKOA",
-          "YBCQXUYWV",
-          "LAOEGMPLB",
-          "NTIQGAHKH"
+          "SPIDERNRN",
+          "UNZCTOWLO",
+          "LDJAEUYFX",
+          "ZIBTHTZEU",
+          "UHCYHIPJC",
+          "BATZTIZGP",
+          "OORDOTQTX",
+          "MEFOQPKUE",
+          "MGZFTPJQR"
          ]
         },
         {
@@ -157,7 +157,7 @@
          "type": "click-on-picture",
          "title": "Find the candy",
          "instruction": "Click on the candy spot.",
-         "image": "",
+         "image": "data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22320%22%20height%3D%22200%22%3E%3Crect%20width%3D%22320%22%20height%3D%22200%22%20fill%3D%22%231e1b2e%22/%3E%3Ctext%20x%3D%2224%22%20y%3D%2246%22%20font-size%3D%2226%22%3E%F0%9F%8E%83%3C/text%3E%3Ctext%20x%3D%2260%22%20y%3D%2290%22%20font-size%3D%2226%22%3E%F0%9F%A6%87%3C/text%3E%3Ctext%20x%3D%22120%22%20y%3D%2250%22%20font-size%3D%2226%22%3E%F0%9F%91%BB%3C/text%3E%3Ctext%20x%3D%22210%22%20y%3D%22130%22%20font-size%3D%2230%22%3E%F0%9F%8D%AC%3C/text%3E%3Ctext%20x%3D%2290%22%20y%3D%22160%22%20font-size%3D%2226%22%3E%F0%9F%95%B7%EF%B8%8F%3C/text%3E%3Ctext%20x%3D%22270%22%20y%3D%2260%22%20font-size%3D%2226%22%3E%F0%9F%95%B8%EF%B8%8F%3C/text%3E%3C/svg%3E",
          "hotspots": [
           {
            "label": "candy 🍬",
@@ -341,16 +341,16 @@
           "WITCH"
          ],
          "grid": [
-          "JNGIFHYJZW",
-          "RMHTDZKYWJ",
-          "QEOQJUXLIT",
-          "VRSWTHPATM",
-          "FKTMTATOCE",
-          "UUHCPOMBHF",
-          "QIWAARAOSY",
-          "TYKNRQSVOA",
-          "OEDDTMKLOY",
-          "JWIYYVZPAY"
+          "KYSPMSGMDA",
+          "BPHBNMHGSG",
+          "KLYEWSOCFK",
+          "WYPHRDSYPH",
+          "IIDSZNTXAH",
+          "MBTKLEYCRI",
+          "ALYCVQCATZ",
+          "SHWTHFUPYK",
+          "KTAUWAMKOV",
+          "BBJCANDYVC"
          ]
         },
         {
@@ -504,7 +504,7 @@
          "type": "gap-fill",
          "title": "Ghost story",
          "instruction": "Complete the story with the correct forms.",
-         "text": "Last night, while I ___ (walk) home, I ___ (hear) a strange noise behind me. My heart ___ (beat) very fast!",
+         "text": "Last night, while I ___ (walk) home, I ___ (hear) a strange noise behind me. My heart was ___ (beat) very fast!",
          "blanks": [
           {
            "answers": [
@@ -535,20 +535,20 @@
          "instruction": "Match the word to its definition.",
          "pairs": [
           {
-           "front": "haunted house",
-           "back": "a house where ghosts appear"
+           "left": "haunted house",
+           "right": "a house where ghosts appear"
           },
           {
-           "front": "trick-or-treat",
-           "back": "children ask for sweets door to door"
+           "left": "trick-or-treat",
+           "right": "children ask for sweets door to door"
           },
           {
-           "front": "costume",
-           "back": "special clothes you wear for fun"
+           "left": "costume",
+           "right": "special clothes you wear for fun"
           },
           {
-           "front": "jack-o'-lantern",
-           "back": "a carved pumpkin with a candle"
+           "left": "jack-o'-lantern",
+           "right": "a carved pumpkin with a candle"
           }
          ]
         },
@@ -559,7 +559,7 @@
          "instruction": "Click the sentences in the correct order.",
          "lines": [
           "Mum switched off all the lights.",
-          "We hid behind the sofa with out masks on.",
+          "We hid behind the sofa with our masks on.",
           "Grandpa opened the door and saw two 'monsters'.",
           "Everybody laughed and ate cake."
          ],
@@ -574,39 +574,104 @@
           {
            "x": 0,
            "y": 0,
+           "letter": "P"
+          },
+          {
+           "x": 1,
+           "y": -4,
+           "letter": "C"
+          },
+          {
+           "x": 1,
+           "y": -3,
+           "letter": "O"
+          },
+          {
+           "x": 1,
+           "y": -2,
            "letter": "S"
           },
           {
            "x": 1,
+           "y": -1,
+           "letter": "T"
+          },
+          {
+           "x": 1,
            "y": 0,
-           "letter": "P"
+           "letter": "U"
+          },
+          {
+           "x": 1,
+           "y": 1,
+           "letter": "M"
+          },
+          {
+           "x": 1,
+           "y": 2,
+           "letter": "E"
           },
           {
            "x": 2,
            "y": 0,
-           "letter": "I"
+           "letter": "M"
           },
           {
            "x": 3,
            "y": 0,
-           "letter": "D"
+           "letter": "P"
           },
           {
            "x": 4,
            "y": 0,
-           "letter": "E"
+           "letter": "K"
+          },
+          {
+           "x": 5,
+           "y": -2,
+           "letter": "T"
+          },
+          {
+           "x": 5,
+           "y": -1,
+           "letter": "R"
           },
           {
            "x": 5,
            "y": 0,
-           "letter": "R"
+           "letter": "I"
+          },
+          {
+           "x": 5,
+           "y": 1,
+           "letter": "C"
+          },
+          {
+           "x": 5,
+           "y": 2,
+           "letter": "K"
+          },
+          {
+           "x": 6,
+           "y": 0,
+           "letter": "N"
           }
          ],
          "clues": [
           {
-           "word": "SPIDER",
-           "clue": "An animal with eight legs",
-           "dir": "across"
+           "word": "PUMPKIN",
+           "dir": "across",
+           "clue": "Orange gourd carved into a lantern"
+          },
+          {
+           "word": "COSTUME",
+           "dir": "down",
+           "clue": "Special clothes you wear on Halloween night"
+          },
+          {
+           "word": "TRICK",
+           "dir": "down",
+           "clue": "If there are no sweets, you get this"
           }
          ]
         },
@@ -624,18 +689,18 @@
           "BROOM"
          ],
          "grid": [
-          "CEWNXXGDFTWH",
-          "SLPMXBOLHYGB",
-          "ZQPLEEGNAJRV",
-          "QMHCBJFVYHAO",
-          "QWVTRMTOCGVV",
-          "FLEBOUCLRZET",
-          "USRTOTBJMEZM",
-          "FHJAMQAXWOSU",
-          "OAUNLSFRVHOT",
-          "IDCAULDRONQN",
-          "XOGSPYAPXENC",
-          "XWVRSSOVMGVP"
+          "MOONNGLQZSRP",
+          "CAULDRONPHGW",
+          "EIXUBWIDEAPN",
+          "RSRMHBUFIDQZ",
+          "YCZJWSROKOMF",
+          "NFGIDJHOUWJJ",
+          "RORPIWSGOCOF",
+          "HRAYRPTEGMMI",
+          "JEVWDBJIXNZZ",
+          "YSERKFMVGLED",
+          "YTCPAOXKQGQW",
+          "IZPMHUQJOYNK"
          ]
         },
         {
@@ -759,20 +824,13 @@
          "type": "gap-fill",
          "title": "Collocations",
          "instruction": "Complete with the right preposition or noun.",
-         "text": "The ghost story sent ___ shivers ___ my spine. Legend has ___ that the castle is haunted ___ centuries.",
+         "text": "The ghost story sent shivers ___ my spine. Legend has ___ that the castle is haunted ___ centuries.",
          "blanks": [
           {
            "answers": [
             "down"
            ],
            "hint": "shivers travel this way"
-          },
-          {
-           "answers": [
-            "of",
-            "down"
-           ],
-           "hint": "...shivers ___ my spine"
           },
           {
            "answers": [
@@ -788,7 +846,7 @@
            "hint": "present perfect time marker"
           }
          ],
-         "explanation": "sent down shivers down my spine / legend has it / haunted for centuries"
+         "explanation": "shivers down my spine / legend has it / haunted for centuries"
         },
         {
          "id": "b15",
@@ -797,24 +855,24 @@
          "instruction": "Match the word to its meaning.",
          "pairs": [
           {
-           "front": "restless spirits",
-           "back": "souls that cannot find peace"
+           "left": "restless spirits",
+           "right": "souls that cannot find peace"
           },
           {
-           "front": "blurred boundary",
-           "back": "an unclear dividing line"
+           "left": "blurred boundary",
+           "right": "an unclear dividing line"
           },
           {
-           "front": "bonfire",
-           "back": "a large outdoor fire"
+           "left": "bonfire",
+           "right": "a large outdoor fire"
           },
           {
-           "front": "guising",
-           "back": "disguised performers asking for treats"
+           "left": "guising",
+           "right": "disguised performers asking for treats"
           },
           {
-           "front": "harvest",
-           "back": "the season of gathering crops"
+           "left": "harvest",
+           "right": "the season of gathering crops"
           }
          ]
         },
@@ -874,84 +932,104 @@
           {
            "x": 0,
            "y": 0,
-           "letter": "S"
-          },
-          {
-           "x": 1,
-           "y": 0,
-           "letter": "A"
-          },
-          {
-           "x": 2,
-           "y": 0,
            "letter": "M"
           },
           {
-           "x": 3,
-           "y": 0,
-           "letter": "H"
-          },
-          {
-           "x": 4,
-           "y": 0,
-           "letter": "A"
-          },
-          {
-           "x": 5,
+           "x": 1,
            "y": 0,
            "letter": "I"
           },
           {
-           "x": 6,
+           "x": 2,
+           "y": -4,
+           "letter": "C"
+          },
+          {
+           "x": 2,
+           "y": -3,
+           "letter": "A"
+          },
+          {
+           "x": 2,
+           "y": -2,
+           "letter": "U"
+          },
+          {
+           "x": 2,
+           "y": -1,
+           "letter": "L"
+          },
+          {
+           "x": 2,
+           "y": 0,
+           "letter": "D"
+          },
+          {
+           "x": 2,
+           "y": 1,
+           "letter": "R"
+          },
+          {
+           "x": 2,
+           "y": 2,
+           "letter": "O"
+          },
+          {
+           "x": 2,
+           "y": 3,
+           "letter": "N"
+          },
+          {
+           "x": 3,
            "y": 0,
            "letter": "N"
           },
           {
-           "x": 1,
+           "x": 4,
+           "y": 0,
+           "letter": "I"
+          },
+          {
+           "x": 4,
            "y": 1,
-           "letter": "A"
-          },
-          {
-           "x": 1,
-           "y": 2,
-           "letter": "U"
-          },
-          {
-           "x": 1,
-           "y": 3,
-           "letter": "L"
-          },
-          {
-           "x": 1,
-           "y": 4,
-           "letter": "D"
-          },
-          {
-           "x": 1,
-           "y": 5,
-           "letter": "R"
-          },
-          {
-           "x": 1,
-           "y": 6,
-           "letter": "O"
-          },
-          {
-           "x": 1,
-           "y": 7,
            "letter": "N"
+          },
+          {
+           "x": 4,
+           "y": 2,
+           "letter": "K"
+          },
+          {
+           "x": 5,
+           "y": 0,
+           "letter": "G"
+          },
+          {
+           "x": 6,
+           "y": 0,
+           "letter": "H"
+          },
+          {
+           "x": 7,
+           "y": 0,
+           "letter": "T"
           }
          ],
          "clues": [
           {
-           "word": "SAMHAIN",
-           "clue": "Ancient Celtic festival Halloween came from",
-           "dir": "across"
+           "word": "MIDNIGHT",
+           "dir": "across",
+           "clue": "The spookiest hour of the night"
           },
           {
            "word": "CAULDRON",
-           "clue": "Big pot witches stir",
-           "dir": "down"
+           "dir": "down",
+           "clue": "The witch stirred the bubbling ___"
+          },
+          {
+           "word": "INK",
+           "dir": "down",
+           "clue": "She wrote the spell in black ___"
           }
          ]
         },
@@ -1106,24 +1184,24 @@
          "instruction": "Match term to definition.",
          "pairs": [
           {
-           "front": "unreliable narrator",
-           "back": "a storyteller whose credibility is compromised"
+           "left": "unreliable narrator",
+           "right": "a storyteller whose credibility is compromised"
           },
           {
-           "front": "foreshadowing",
-           "back": "early hints of later events"
+           "left": "foreshadowing",
+           "right": "early hints of later events"
           },
           {
-           "front": "red herring",
-           "back": "a false clue diverting attention"
+           "left": "red herring",
+           "right": "a false clue diverting attention"
           },
           {
-           "front": "denouement",
-           "back": "the final resolution of the plot"
+           "left": "denouement",
+           "right": "the final resolution of the plot"
           },
           {
-           "front": "gothic",
-           "back": "mood of decay, mystery and dread"
+           "left": "gothic",
+           "right": "mood of decay, mystery and dread"
           }
          ]
         },
@@ -1172,17 +1250,17 @@
           {
            "x": 1,
            "y": 0,
-           "letter": "R"
+           "letter": "T"
           },
           {
            "x": 2,
            "y": 0,
-           "letter": "O"
+           "letter": "M"
           },
           {
            "x": 3,
            "y": 0,
-           "letter": "U"
+           "letter": "O"
           },
           {
            "x": 4,
@@ -1190,21 +1268,121 @@
            "letter": "S"
           },
           {
+           "x": 4,
+           "y": 1,
+           "letter": "P"
+          },
+          {
+           "x": 4,
+           "y": 2,
+           "letter": "E"
+          },
+          {
+           "x": 4,
+           "y": 3,
+           "letter": "C"
+          },
+          {
+           "x": 4,
+           "y": 4,
+           "letter": "T"
+          },
+          {
+           "x": 4,
+           "y": 5,
+           "letter": "R"
+          },
+          {
+           "x": 4,
+           "y": 6,
+           "letter": "E"
+          },
+          {
            "x": 5,
            "y": 0,
-           "letter": "A"
+           "letter": "P"
+          },
+          {
+           "x": 6,
+           "y": -1,
+           "letter": "P"
           },
           {
            "x": 6,
            "y": 0,
+           "letter": "H"
+          },
+          {
+           "x": 6,
+           "y": 1,
+           "letter": "O"
+          },
+          {
+           "x": 6,
+           "y": 2,
+           "letter": "B"
+          },
+          {
+           "x": 6,
+           "y": 3,
+           "letter": "I"
+          },
+          {
+           "x": 6,
+           "y": 4,
+           "letter": "A"
+          },
+          {
+           "x": 7,
+           "y": 0,
+           "letter": "E"
+          },
+          {
+           "x": 8,
+           "y": -2,
            "letter": "L"
+          },
+          {
+           "x": 8,
+           "y": -1,
+           "letter": "O"
+          },
+          {
+           "x": 8,
+           "y": 0,
+           "letter": "R"
+          },
+          {
+           "x": 8,
+           "y": 1,
+           "letter": "E"
+          },
+          {
+           "x": 9,
+           "y": 0,
+           "letter": "E"
           }
          ],
          "clues": [
           {
-           "word": "AROUSAL",
-           "clue": "Physiological excitement of fear response",
-           "dir": "across"
+           "word": "ATMOSPHERE",
+           "dir": "across",
+           "clue": "Mood of dread a gothic story builds"
+          },
+          {
+           "word": "SPECTRE",
+           "dir": "down",
+           "clue": "A ghost seen before dawn"
+          },
+          {
+           "word": "PHOBIA",
+           "dir": "down",
+           "clue": "An irrational fear, e.g. of the dark"
+          },
+          {
+           "word": "LORE",
+           "dir": "down",
+           "clue": "Old stories and knowledge passed down"
           }
          ]
         },
@@ -1223,18 +1401,18 @@
           "LORE"
          ],
          "grid": [
-          "SREBSJRLMDJL",
-          "ZPZZOZZBAOYC",
-          "TUIOPXPTCLSS",
-          "CRKRLPHEASOL",
-          "IOFOIOOEBEDD",
-          "PUIPFTBXRSOR",
-          "UCEDIZIXEUSE",
-          "TGAILFAELNMA",
-          "CAROUSALOETD",
-          "AESINRXARAUV",
-          "FVXMSNIWESYW",
-          "MJPYKZSKNYBJ"
+          "PRHHEGOGVVUQ",
+          "HNHLOREAZDGD",
+          "OFHAROUSALIM",
+          "BSPIRITXUCFF",
+          "ITPNVNHMDMDR",
+          "AUNEASYAAQRQ",
+          "DBDNZGLCZLED",
+          "MKWPNGXALCAU",
+          "XCWRPTGBXTDS",
+          "CIOCMVKRFEZQ",
+          "IOPFCYJEHKTV",
+          "JXVVIZCJZVEQ"
          ]
         }
        ]
